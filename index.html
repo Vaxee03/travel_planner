@@ -238,6 +238,7 @@
   var trips = [];
   var ui = { screen:'home', tripId:null, tab:'itinerary', dayIdx:null, modal:null };
   var uploadingPhoto = false;
+  var photoUploadError = null;
   var food = { region:'', preference:'', loading:false, error:null, results:null };
 
   var DEFAULT_CHECKLIST = [
@@ -621,6 +622,9 @@
     if(!assetsNs){
       html += '<div class="note"><span class="dot"></span><span>이 화면에서는 사진 업로드를 사용할 수 없어요.</span></div>';
     }
+    if(photoUploadError){
+      html += '<div class="note"><span class="dot"></span><span>' + esc(photoUploadError) + '</span></div>';
+    }
     html += '</section>';
     return html;
   }
@@ -642,6 +646,13 @@
   }
 
   function buildModalContent(m){
+    if(m.type === "confirm"){
+      return '<h3>확인</h3><p style="margin:0 0 4px;">' + esc(m.message) + '</p>' +
+        '<div class="modal-actions">' +
+          '<button type="button" class="btn" data-action="close-modal">취소</button>' +
+          '<button type="button" class="btn btn-primary" style="background:var(--danger);border-color:var(--danger);" data-action="confirm-yes">삭제</button>' +
+        '</div>';
+    }
     if(m.type === "add-trip"){
       return '<h3>새 여행 만들기</h3><form data-form="add-trip">' +
         field("title","여행 이름","text","예: 오사카 벚꽃 여행", true) +
@@ -750,21 +761,13 @@
     if(action === "add-trip"){ openModal("add-trip"); return; }
     if(action === "edit-trip"){ openModal("edit-trip"); return; }
     if(action === "delete-trip"){
-      if(confirm("이 여행을 삭제할까요? 되돌릴 수 없어요.")){
-        db.doc("trips/"+id).delete();
-        ui.screen="home"; ui.tripId=null; render();
-      }
+      openModal("confirm", { message:"이 여행을 삭제할까요? 되돌릴 수 없어요.", onYes:"delete-trip", targetId:id });
       return;
     }
     if(action === "add-day"){ openModal("add-day"); return; }
     if(action === "edit-day"){ openModal("edit-day", { idx:Number(idx) }); return; }
     if(action === "delete-day"){
-      var trip = getTrip(ui.tripId);
-      if(confirm("이 날짜를 삭제할까요?")){
-        trip.days.splice(Number(idx),1);
-        saveTrip(trip);
-        ui.dayIdx = null; render();
-      }
+      openModal("confirm", { message:"이 날짜를 삭제할까요?", onYes:"delete-day", idx:Number(idx) });
       return;
     }
     if(action === "open-day"){ ui.dayIdx = Number(idx); render(); return; }
@@ -772,12 +775,25 @@
     if(action === "add-item"){ openModal("add-item"); return; }
     if(action === "edit-item"){ openModal("edit-item", { idx:Number(idx) }); return; }
     if(action === "delete-item"){
-      var trip4 = getTrip(ui.tripId);
-      var d = trip4.days[ui.dayIdx];
-      if(confirm("이 항목을 삭제할까요?")){
-        d.items.splice(Number(idx),1);
-        saveTrip(trip4); render();
+      openModal("confirm", { message:"이 항목을 삭제할까요?", onYes:"delete-item", idx:Number(idx) });
+      return;
+    }
+    if(action === "confirm-yes"){
+      var m = ui.modal || {};
+      if(m.onYes === "delete-trip"){
+        db.doc("trips/"+m.targetId).delete();
+        ui.screen="home"; ui.tripId=null;
+      } else if(m.onYes === "delete-day"){
+        var tripD = getTrip(ui.tripId);
+        tripD.days.splice(m.idx,1);
+        saveTrip(tripD);
+        ui.dayIdx = null;
+      } else if(m.onYes === "delete-item"){
+        var tripI = getTrip(ui.tripId);
+        tripI.days[ui.dayIdx].items.splice(m.idx,1);
+        saveTrip(tripI);
       }
+      closeModal();
       return;
     }
     if(action === "add-budget"){ openModal("add-budget"); return; }
@@ -817,13 +833,13 @@
       var file = e.target.files[0];
       var trip = getTrip(ui.tripId);
       if(!assetsNs || !trip) return;
-      uploadingPhoto = true; render();
+      uploadingPhoto = true; photoUploadError = null; render();
       assetsNs.upload(file).then(function(res){
         trip.review = trip.review || { text:"", photoIds:[] };
         trip.review.photoIds = (trip.review.photoIds||[]).concat([res.id]);
         return saveTrip(trip);
       }).catch(function(err){
-        alert("사진 업로드에 실패했어요: " + (err && err.message ? err.message : "알 수 없는 오류"));
+        photoUploadError = "사진 업로드에 실패했어요: " + (err && err.message ? err.message : "알 수 없는 오류");
       }).then(function(){
         uploadingPhoto = false; render();
       });
