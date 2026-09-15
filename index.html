@@ -199,6 +199,17 @@
   .photo-del{ position:absolute; top:6px; right:6px; background:rgba(0,0,0,.55); color:#fff; border:none; border-radius:6px; width:24px; height:24px; cursor:pointer; font-size:13px; }
   .photo-uploading{ display:flex; align-items:center; justify-content:center; font-size:12px; color:var(--ink-soft); }
 
+  /* ---- Food recommendation ---- */
+  .food-form{ display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:22px; }
+  .food-form .field{ flex:1 1 160px; margin-bottom:0; }
+  .food-results{ display:flex; flex-direction:column; gap:12px; }
+  .food-card{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:16px 18px; }
+  .food-card-top{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px; }
+  .food-card-name{ font-family:"Noto Serif KR",serif; font-weight:700; font-size:16.5px; }
+  .food-card-tag{ font-size:12px; color:var(--ink-soft); background:var(--surface-2); padding:3px 9px; border-radius:999px; white-space:nowrap; }
+  .food-card-why{ font-size:14px; color:var(--ink-soft); }
+  .food-loading{ text-align:center; color:var(--ink-soft); font-size:14px; padding:24px; }
+
   /* ---- Modal ---- */
   .modal-overlay{ position:fixed; inset:0; background:rgba(20,16,12,.45); display:flex; align-items:center; justify-content:center; padding:24px; z-index:50; }
   .modal{ background:var(--surface); border-radius:16px; border:1px solid var(--line); padding:26px 26px 22px; width:100%; max-width:440px; max-height:88vh; overflow-y:auto; }
@@ -219,10 +230,11 @@
 (function(){
   "use strict";
 
-  var db = null, assetsNs = null, dbReady = false;
+  var db = null, assetsNs = null, sampleNs = null, dbReady = false;
   var trips = [];
   var ui = { screen:'home', tripId:null, tab:'itinerary', dayIdx:null, modal:null };
   var uploadingPhoto = false;
+  var food = { region:'', preference:'', loading:false, error:null, results:null };
 
   var DEFAULT_CHECKLIST = [
     "여권 & 항공권 e-티켓","엔화 환전 / 트래블카드","eSIM 또는 포켓와이파이",
@@ -318,6 +330,7 @@
           '<div class="trip-card-meta">' +
             '<span>📍 ' + esc(t.destination || "-") + '</span>' +
             '<span class="nums">📅 ' + esc(t.startDate) + ' ~ ' + esc(t.endDate) + '</span>' +
+            (t.travelers ? '<span class="nums">👥 ' + esc(t.travelers) + '명</span>' : '') +
             (t.budgetTotal ? '<span class="nums">💴 ' + fmtMoney(t.budgetTotal) + '원</span>' : '') +
           '</div>' +
         '</button>';
@@ -343,13 +356,14 @@
         '<span class="chip">' + '<span class="status ' + st + '">' + statusLabel(st) + '</span></span>' +
         '<span class="chip">📍 ' + esc(trip.destination || "-") + '</span>' +
         '<span class="chip nums">📅 ' + esc(trip.startDate) + ' – ' + esc(trip.endDate) + '</span>' +
+        (trip.travelers ? '<span class="chip">👥 <b>' + esc(trip.travelers) + '명</b></span>' : '') +
         (trip.budgetTotal ? '<span class="chip">💴 예산 <b>' + fmtMoney(trip.budgetTotal) + '원</b></span>' : '') +
       '</div>' +
     '</div>';
 
     var canReview = st === "completed";
     html += '<div class="tabbar">' +
-      tabBtn("itinerary","일정") + tabBtn("budget","예산") + tabBtn("checklist","체크리스트") +
+      tabBtn("itinerary","일정") + tabBtn("budget","예산") + tabBtn("checklist","체크리스트") + tabBtn("food","맛집 추천") +
       '<button class="tab' + (ui.tab==="review"?" active":"") + '" ' + (canReview?'':'disabled') +
         ' data-action="set-tab" data-tab="review">후기' + (canReview?'':' 🔒') + '</button>' +
     '</div>';
@@ -357,6 +371,7 @@
     if(ui.tab === "itinerary") html += renderItinerary(trip);
     else if(ui.tab === "budget") html += renderBudget(trip);
     else if(ui.tab === "checklist") html += renderChecklist(trip);
+    else if(ui.tab === "food") html += renderFood(trip);
     else if(ui.tab === "review") html += renderReview(trip, canReview);
 
     return html;
@@ -512,6 +527,48 @@
     return html;
   }
 
+  function renderFood(trip){
+    var html = '<section><div class="section-head"><h2>AI 맛집 추천</h2>' +
+      '<span class="section-note">Claude의 지식 기반 추천 · 참고용, 방문 전 확인 필요</span></div>';
+
+    if(!sampleNs){
+      html += '<div class="empty">이 화면에서는 AI 추천 기능을 사용할 수 없어요.</div></section>';
+      return html;
+    }
+
+    if(!food.region) food.region = trip.destination || "";
+
+    html += '<form class="food-form" data-form="food-reco">' +
+      '<div class="field"><label>지역</label><input name="region" type="text" placeholder="예: 아키하바라, 모토하코네" value="' + esc(food.region) + '" required></div>' +
+      '<div class="field"><label>선호(선택)</label><input name="preference" type="text" placeholder="예: 라멘, 가성비, 현지인 맛집" value="' + esc(food.preference) + '"></div>' +
+      '<button type="submit" class="btn btn-primary" ' + (food.loading?'disabled':'') + '>' + (food.loading?"찾는 중…":"추천받기") + '</button>' +
+    '</form>';
+
+    if(food.error){
+      html += '<div class="note"><span class="dot"></span><span>' + esc(food.error) + '</span></div>';
+    }
+
+    if(food.loading){
+      html += '<div class="food-loading">근처 맛집을 찾고 있어요…</div>';
+    } else if(food.results && food.results.length){
+      html += '<div class="food-results">';
+      food.results.forEach(function(r){
+        html += '<div class="food-card">' +
+          '<div class="food-card-top"><span class="food-card-name">' + esc(r.name) + '</span>' +
+          (r.category ? '<span class="food-card-tag">' + esc(r.category) + '</span>' : '') + '</div>' +
+          (r.why ? '<div class="food-card-why">' + esc(r.why) + '</div>' : '') +
+        '</div>';
+      });
+      html += '</div>';
+    } else if(food.results){
+      html += '<div class="empty">추천 결과가 없어요. 다른 지역으로 시도해보세요.</div>';
+    }
+
+    html += '<div class="note"><span class="dot"></span><span>AI가 알고 있는 정보를 바탕으로 한 참고용 추천이에요. 실제 영업 여부·주소·평점은 방문 전 꼭 다시 확인하세요.</span></div>';
+    html += '</section>';
+    return html;
+  }
+
   function renderReview(trip, canReview){
     if(!canReview){
       return '<section><div class="review-locked"><span>🔒</span>' +
@@ -576,7 +633,7 @@
         field("title","여행 이름","text","예: 오사카 벚꽃 여행", true) +
         field("destination","목적지","text","예: 오사카", false) +
         '<div class="field-row">' + field("startDate","시작일","date","",true) + field("endDate","종료일","date","",true) + '</div>' +
-        field("budgetTotal","총 예산 (원)","number","예: 1000000", false) +
+        '<div class="field-row">' + field("travelers","인원 수","number","예: 2", false, 1) + field("budgetTotal","총 예산 (원)","number","예: 1000000", false) + '</div>' +
         modalActions("여행 만들기") + '</form>';
     }
     if(m.type === "edit-trip"){
@@ -585,7 +642,7 @@
         field("title","여행 이름","text","",true,t.title) +
         field("destination","목적지","text","",false,t.destination) +
         '<div class="field-row">' + field("startDate","시작일","date","",true,t.startDate) + field("endDate","종료일","date","",true,t.endDate) + '</div>' +
-        field("budgetTotal","총 예산 (원)","number","",false,t.budgetTotal) +
+        '<div class="field-row">' + field("travelers","인원 수","number","",false,t.travelers||1) + field("budgetTotal","총 예산 (원)","number","",false,t.budgetTotal) + '</div>' +
         modalActions("저장") + '</form>';
     }
     if(m.type === "add-day" || m.type === "edit-day"){
@@ -661,7 +718,11 @@
 
     if(action === "close-modal"){ closeModal(); return; }
     if(action === "go-home"){ ui.screen="home"; ui.tripId=null; ui.dayIdx=null; ui.tab="itinerary"; render(); return; }
-    if(action === "open-trip"){ ui.screen="trip"; ui.tripId=id; ui.tab="itinerary"; ui.dayIdx=null; render(); return; }
+    if(action === "open-trip"){
+      ui.screen="trip"; ui.tripId=id; ui.tab="itinerary"; ui.dayIdx=null;
+      food = { region:'', preference:'', loading:false, error:null, results:null };
+      render(); return;
+    }
     if(action === "set-tab"){ ui.tab = el.getAttribute("data-tab"); ui.dayIdx=null; render(); return; }
     if(action === "add-trip"){ openModal("add-trip"); return; }
     if(action === "edit-trip"){ openModal("edit-trip"); return; }
@@ -758,6 +819,7 @@
       var newTrip = {
         title: val("title"), destination: val("destination"),
         startDate: val("startDate"), endDate: val("endDate"),
+        travelers: Number(val("travelers")) || 1,
         budgetTotal: Number(val("budgetTotal")) || 0,
         days: [], budgetItems: [],
         checklist: JSON.parse(JSON.stringify(DEFAULT_CHECKLIST)),
@@ -774,8 +836,31 @@
       var t = getTrip(ui.tripId);
       t.title = val("title"); t.destination = val("destination");
       t.startDate = val("startDate"); t.endDate = val("endDate");
+      t.travelers = Number(val("travelers")) || 1;
       t.budgetTotal = Number(val("budgetTotal")) || 0;
       saveTrip(t); closeModal();
+      return;
+    }
+    if(type === "food-reco"){
+      food.region = val("region"); food.preference = val("preference");
+      food.error = null; food.results = null; food.loading = true;
+      render();
+      if(!sampleNs){ food.loading=false; food.error="AI 추천 기능을 사용할 수 없어요."; render(); return; }
+      var prompt = "여행 앱의 맛집 추천 기능이야. \"" + food.region + "\" 지역/근처에서 갈만한 음식점을 5곳 추천해줘." +
+        (food.preference ? (" 선호: " + food.preference + ".") : "") +
+        " 반드시 아래 JSON 배열 형식으로만 응답하고 다른 텍스트는 포함하지 마: " +
+        '[{"name":"가게 이름","category":"음식 종류/특징 (짧게)","why":"추천 이유 (한 문장)"}]';
+      sampleNs.json(prompt, { modelTier:"default" }).then(function(res){
+        food.loading = false;
+        food.results = Array.isArray(res) ? res : (res && Array.isArray(res.results) ? res.results : []);
+        render();
+      }).catch(function(err){
+        food.loading = false;
+        food.error = (err && err.code === "not_granted")
+          ? "AI 추천 기능을 사용할 수 없어요."
+          : "추천을 가져오지 못했어요. 잠시 후 다시 시도해주세요.";
+        render();
+      });
       return;
     }
     if(type === "add-day"){
@@ -855,6 +940,7 @@
       }, function(){ /* keep last known state */ });
     });
     window.claude.use("assets").then(function(ns){ assetsNs = ns; render(); });
+    window.claude.use("sample").then(function(ns){ sampleNs = ns; render(); });
   })();
 })();
 </script>
