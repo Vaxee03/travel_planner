@@ -63,6 +63,9 @@
     width:100%;
   }
   label{ font-size:12.5px; color:var(--ink-soft); font-weight:700; display:block; margin-bottom:5px; }
+  input[type="number"]{ -moz-appearance:textfield; appearance:textfield; }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
 
   /* ---- Buttons ---- */
   .btn{
@@ -230,7 +233,7 @@
 (function(){
   "use strict";
 
-  var db = null, assetsNs = null, sampleNs = null, dbReady = false;
+  var db = null, assetsNs = null, sampleNs = null, dbReady = false, dbState = "loading";
   var trips = [];
   var ui = { screen:'home', tripId:null, tab:'itinerary', dayIdx:null, modal:null };
   var uploadingPhoto = false;
@@ -310,7 +313,10 @@
 
   function renderHome(){
     if(!dbReady){
-      return '<div class="empty">저장 기능을 불러오는 중이거나 사용할 수 없어요. 새로고침해보세요.</div>';
+      var msg = dbState === "loading" ? "저장 기능을 불러오는 중이에요…"
+        : dbState === "unavailable" ? "이 화면에서는 저장 기능을 사용할 수 없어요. (window.claude.use(\"db\")가 null을 반환했어요)"
+        : "실시간 연결이 끊겼어요. 새로고침해보세요. (오류: " + esc(dbState) + ")";
+      return '<div class="empty">' + msg + '</div>';
     }
     var html = '<section><div class="section-head"><h2>내 여행</h2>' +
       '<button class="btn btn-primary" data-action="add-trip">+ 새 여행</button></div>';
@@ -923,7 +929,7 @@
     if(!window.claude || !window.claude.use){ return; }
     window.claude.use("db").then(function(ns){
       db = ns;
-      if(!db){ dbReady = false; render(); return; }
+      if(!db){ dbReady = false; dbState = "unavailable"; render(); return; }
       dbReady = true;
       db.collection("trips").onSnapshot(function(snap){
         trips = snap.docs.map(function(doc){
@@ -936,8 +942,12 @@
           return data;
         });
         render();
-      }, function(){ /* keep last known state */ });
-    });
+      }, function(err){
+        dbReady = false;
+        dbState = (err && err.code) ? err.code : "unknown_error";
+        render();
+      });
+    }).catch(function(){ dbReady = false; dbState = "unavailable"; render(); });
     window.claude.use("assets").then(function(ns){ assetsNs = ns; render(); });
     window.claude.use("sample").then(function(ns){ sampleNs = ns; render(); });
   })();
