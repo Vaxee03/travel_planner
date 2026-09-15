@@ -620,10 +620,9 @@
       document.body.appendChild(root);
     }
     if(!ui.modal){ root.innerHTML = ""; return; }
-    root.innerHTML = '<div class="modal-overlay" data-action="close-modal">' +
+    root.innerHTML = '<div class="modal-overlay">' +
       '<div class="modal" id="modal-box"></div></div>';
     var box = document.getElementById("modal-box");
-    box.addEventListener("click", function(e){ e.stopPropagation(); });
     box.innerHTML = buildModalContent(ui.modal);
   }
 
