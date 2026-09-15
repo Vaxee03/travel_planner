@@ -234,7 +234,7 @@
   "use strict";
 
   var db = null, assetsNs = null, sampleNs = null, dbReady = false, dbState = "loading";
-  var debugInfo = { snapshots:0, lastSize:null, lastFromCache:null, lastAt:null, manualSize:null, manualError:null };
+  var debugInfo = { snapshots:0, lastSize:null, lastFromCache:null, lastAt:null, manualSize:null, manualError:null, mapError:null };
   var trips = [];
   var ui = { screen:'home', tripId:null, tab:'itinerary', dayIdx:null, modal:null };
   var uploadingPhoto = false;
@@ -329,6 +329,7 @@
         ', 캐시여부: ' + debugInfo.lastFromCache + ', 수신 시각: ' + esc(debugInfo.lastAt) +
         (debugInfo.manualSize != null ? (' · 단발성 조회 결과: ' + debugInfo.manualSize + '건') : '') +
         (debugInfo.manualError ? (' · 단발성 조회 오류: ' + esc(debugInfo.manualError)) : '') +
+        (debugInfo.mapError ? (' · 변환 오류: ' + esc(debugInfo.mapError)) : '') +
         '</span></div>';
       html += '<button class="btn btn-sm" style="margin-top:10px;" data-action="debug-refetch">단발성으로 다시 조회</button>';
     } else {
@@ -953,15 +954,20 @@
         debugInfo.lastSize = snap.size;
         debugInfo.lastFromCache = snap.metadata ? snap.metadata.fromCache : "?";
         debugInfo.lastAt = new Date().toLocaleTimeString("ko-KR");
-        trips = snap.docs.map(function(doc){
-          var data = doc.data() || {};
-          data.id = doc.id;
-          data.days = data.days || [];
-          data.budgetItems = data.budgetItems || [];
-          data.checklist = data.checklist || [];
-          data.review = data.review || { text:"", photoIds:[] };
-          return data;
-        });
+        try{
+          trips = snap.docs.map(function(doc){
+            var data = (typeof doc.data === "function" ? doc.data() : doc.data) || {};
+            data.id = doc.id;
+            data.days = data.days || [];
+            data.budgetItems = data.budgetItems || [];
+            data.checklist = data.checklist || [];
+            data.review = data.review || { text:"", photoIds:[] };
+            return data;
+          });
+          debugInfo.mapError = null;
+        } catch(mapErr){
+          debugInfo.mapError = (mapErr && mapErr.message) ? mapErr.message : String(mapErr);
+        }
         render();
       }, function(err){
         dbReady = false;
