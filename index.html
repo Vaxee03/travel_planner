@@ -956,7 +956,8 @@
         debugInfo.lastAt = new Date().toLocaleTimeString("ko-KR");
         try{
           trips = snap.docs.map(function(doc){
-            var data = (typeof doc.data === "function" ? doc.data() : doc.data) || {};
+            var raw = (typeof doc.data === "function" ? doc.data() : doc.data) || {};
+            var data = JSON.parse(JSON.stringify(raw));
             data.id = doc.id;
             data.days = data.days || [];
             data.budgetItems = data.budgetItems || [];
