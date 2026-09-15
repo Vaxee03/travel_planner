@@ -234,6 +234,7 @@
   "use strict";
 
   var db = null, assetsNs = null, sampleNs = null, dbReady = false, dbState = "loading";
+  var debugInfo = { snapshots:0, lastSize:null, lastFromCache:null, lastAt:null, manualSize:null, manualError:null };
   var trips = [];
   var ui = { screen:'home', tripId:null, tab:'itinerary', dayIdx:null, modal:null };
   var uploadingPhoto = false;
@@ -323,6 +324,13 @@
 
     if(trips.length === 0){
       html += '<div class="empty">아직 등록된 여행이 없어요. "새 여행"으로 첫 여행을 만들어보세요.</div>';
+      html += '<div class="note" style="margin-top:14px;"><span class="dot"></span><span>' +
+        '진단 정보 — 실시간 구독 수신 ' + debugInfo.snapshots + '회, 마지막 문서 수: ' + debugInfo.lastSize +
+        ', 캐시여부: ' + debugInfo.lastFromCache + ', 수신 시각: ' + esc(debugInfo.lastAt) +
+        (debugInfo.manualSize != null ? (' · 단발성 조회 결과: ' + debugInfo.manualSize + '건') : '') +
+        (debugInfo.manualError ? (' · 단발성 조회 오류: ' + esc(debugInfo.manualError)) : '') +
+        '</span></div>';
+      html += '<button class="btn btn-sm" style="margin-top:10px;" data-action="debug-refetch">단발성으로 다시 조회</button>';
     } else {
       var sorted = trips.slice().sort(function(a,b){ return (a.startDate||"").localeCompare(b.startDate||""); });
       html += '<div class="trip-grid">';
@@ -729,6 +737,15 @@
       render(); return;
     }
     if(action === "set-tab"){ ui.tab = el.getAttribute("data-tab"); ui.dayIdx=null; render(); return; }
+    if(action === "debug-refetch"){
+      if(!db){ debugInfo.manualError = "db is null"; render(); return; }
+      db.collection("trips").get().then(function(snap){
+        debugInfo.manualSize = snap.size; debugInfo.manualError = null; render();
+      }).catch(function(err){
+        debugInfo.manualError = (err && err.code) || "unknown"; render();
+      });
+      return;
+    }
     if(action === "add-trip"){ openModal("add-trip"); return; }
     if(action === "edit-trip"){ openModal("edit-trip"); return; }
     if(action === "delete-trip"){
@@ -932,6 +949,10 @@
       if(!db){ dbReady = false; dbState = "unavailable"; render(); return; }
       dbReady = true;
       db.collection("trips").onSnapshot(function(snap){
+        debugInfo.snapshots++;
+        debugInfo.lastSize = snap.size;
+        debugInfo.lastFromCache = snap.metadata ? snap.metadata.fromCache : "?";
+        debugInfo.lastAt = new Date().toLocaleTimeString("ko-KR");
         trips = snap.docs.map(function(doc){
           var data = doc.data() || {};
           data.id = doc.id;
