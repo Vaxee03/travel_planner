@@ -1,0 +1,709 @@
+<title>도쿄·하코네 12월 여행</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&family=Noto+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+  :root{
+    --bg:#faf6ef;
+    --surface:#ffffff;
+    --surface-2:#f2ece0;
+    --ink:#211d1c;
+    --ink-soft:#6b625a;
+    --line:#e2d8c8;
+    --accent:#b8402f;
+    --accent-soft:#f0d9c9;
+    --gold:#9c7a3f;
+    --confirmed:#3f5a4a;
+    --confirmed-soft:#e1ebe3;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#16181d;
+      --surface:#1f2228;
+      --surface-2:#262a32;
+      --ink:#ece6db;
+      --ink-soft:#9a9186;
+      --line:#3a3d44;
+      --accent:#e07a63;
+      --accent-soft:#3a2b26;
+      --gold:#c9a35f;
+      --confirmed:#8fbfa2;
+      --confirmed-soft:#233229;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#16181d;
+    --surface:#1f2228;
+    --surface-2:#262a32;
+    --ink:#ece6db;
+    --ink-soft:#9a9186;
+    --line:#3a3d44;
+    --accent:#e07a63;
+    --accent-soft:#3a2b26;
+    --gold:#c9a35f;
+    --confirmed:#8fbfa2;
+    --confirmed-soft:#233229;
+  }
+
+  *{box-sizing:border-box;}
+  a{ color:var(--accent); }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:"Noto Sans KR","Malgun Gothic",sans-serif;
+    line-height:1.6;
+    margin:0;
+    padding:64px 20px 100px;
+  }
+  .page{
+    max-width:760px;
+    margin:0 auto;
+  }
+  .nums{ font-variant-numeric:tabular-nums; }
+  [hidden]{ display:none !important; }
+
+  /* ---- Header ---- */
+  header{
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+    padding-bottom:36px;
+    border-bottom:1px solid var(--line);
+    margin-bottom:44px;
+  }
+  .eyebrow{
+    font-size:12.5px;
+    letter-spacing:0.16em;
+    text-transform:uppercase;
+    color:var(--gold);
+    font-weight:700;
+  }
+  h1{
+    font-family:"Noto Serif KR",serif;
+    font-weight:700;
+    font-size:clamp(30px,5vw,42px);
+    margin:0;
+    text-wrap:balance;
+    letter-spacing:-0.01em;
+  }
+  .subline{
+    color:var(--ink-soft);
+    font-size:15.5px;
+  }
+  .chips{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top:4px;
+  }
+  .chip{
+    font-size:13px;
+    padding:6px 14px;
+    border-radius:999px;
+    background:var(--surface-2);
+    color:var(--ink);
+    border:1px solid var(--line);
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .chip b{ color:var(--accent); font-weight:700; }
+
+  /* ---- Section headings ---- */
+  .section-head{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    margin-bottom:22px;
+    gap:16px;
+  }
+  .section-head h2{
+    font-family:"Noto Serif KR",serif;
+    font-size:22px;
+    font-weight:700;
+    margin:0;
+  }
+  .section-note{
+    font-size:13px;
+    color:var(--ink-soft);
+  }
+  section{ margin-bottom:56px; }
+
+  button{ font:inherit; }
+  button:focus-visible, a:focus-visible, [tabindex]:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:3px;
+  }
+
+  /* ---- Timeline (list view) ---- */
+  .timeline{
+    position:relative;
+    padding-left:32px;
+  }
+  .timeline::before{
+    content:"";
+    position:absolute;
+    left:9px;
+    top:6px;
+    bottom:6px;
+    width:1px;
+    background:var(--line);
+  }
+  .day{
+    position:relative;
+    padding-bottom:16px;
+  }
+  .day:last-child{ padding-bottom:0; }
+  .day::before{
+    content:"";
+    position:absolute;
+    left:-32px;
+    top:4px;
+    width:11px;
+    height:11px;
+    border-radius:50%;
+    background:var(--surface);
+    border:2px solid var(--line);
+  }
+  .day.confirmed::before{ border-color:var(--confirmed); background:var(--confirmed); }
+  .day.open::before{ border-color:var(--gold); background:var(--surface); }
+
+  .day-summary{
+    width:100%;
+    text-align:left;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px 20px;
+    cursor:pointer;
+    transition:border-color .15s ease, transform .15s ease;
+    display:block;
+    color:inherit;
+  }
+  .day-summary:hover{
+    border-color:var(--accent);
+    transform:translateX(2px);
+  }
+  .day-top{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-bottom:8px;
+  }
+  .day-title{
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+  }
+  .day-num{
+    font-family:"Noto Serif KR",serif;
+    font-weight:700;
+    font-size:15px;
+    color:var(--ink-soft);
+  }
+  .day-date{
+    font-weight:700;
+    font-size:16.5px;
+  }
+  .status{
+    font-size:11.5px;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    font-weight:700;
+    padding:4px 10px;
+    border-radius:999px;
+    flex:0 0 auto;
+  }
+  .status.confirmed{ color:var(--confirmed); background:var(--confirmed-soft); }
+  .status.open{ color:var(--gold); background:var(--surface-2); }
+
+  .day-summary-body{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+  }
+  .day-summary-text{
+    font-size:15px;
+    color:var(--ink);
+  }
+  .day-summary-text.muted{ color:var(--ink-soft); font-style:italic; }
+  .day-arrow{
+    flex:0 0 auto;
+    font-size:13px;
+    color:var(--accent);
+    font-weight:700;
+    white-space:nowrap;
+  }
+
+  /* ---- Detail view ---- */
+  .back-link{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-size:14px;
+    font-weight:700;
+    color:var(--ink-soft);
+    background:none;
+    border:none;
+    padding:0;
+    cursor:pointer;
+    margin-bottom:28px;
+  }
+  .back-link:hover{ color:var(--accent); }
+
+  .detail-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:12px;
+    margin-bottom:6px;
+  }
+  .detail-head h2{
+    font-family:"Noto Serif KR",serif;
+    font-size:26px;
+    font-weight:700;
+    margin:0;
+  }
+  .detail-sub{
+    color:var(--ink-soft);
+    font-size:14.5px;
+    margin-bottom:28px;
+  }
+
+  .day-card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:22px 24px;
+  }
+  .day-body p{ margin:0; color:var(--ink); }
+  .day-body p.muted{ color:var(--ink-soft); font-style:italic; }
+  .plan-list{
+    list-style:none;
+    margin:0;
+    padding:0;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+  .plan-list li{
+    display:flex;
+    gap:14px;
+    font-size:15px;
+  }
+  .plan-time{
+    flex:0 0 auto;
+    color:var(--accent);
+    font-weight:700;
+    font-size:13.5px;
+    padding-top:2px;
+    min-width:58px;
+  }
+  .detail-note{
+    margin-top:20px;
+    display:flex;
+    gap:10px;
+    align-items:flex-start;
+    font-size:13.5px;
+    color:var(--ink-soft);
+    background:var(--surface-2);
+    border-radius:10px;
+    padding:12px 16px;
+  }
+  .detail-note .dot{
+    flex:0 0 auto;
+    width:6px; height:6px;
+    margin-top:7px;
+    border-radius:50%;
+    background:var(--gold);
+  }
+
+  /* ---- Budget ---- */
+  .budget-hero{
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:18px;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:26px 26px;
+    margin-bottom:16px;
+  }
+  .budget-label{
+    font-size:13px;
+    color:var(--ink-soft);
+    margin-bottom:6px;
+  }
+  .budget-amount{
+    font-family:"JetBrains Mono",monospace;
+    font-size:36px;
+    font-weight:500;
+    letter-spacing:-0.02em;
+  }
+  .budget-amount span{ font-size:18px; color:var(--ink-soft); margin-left:4px; }
+  .budget-per{
+    text-align:right;
+    color:var(--ink-soft);
+    font-size:13.5px;
+  }
+  .budget-per b{
+    display:block;
+    font-family:"JetBrains Mono",monospace;
+    color:var(--ink);
+    font-size:20px;
+    font-weight:500;
+  }
+  .budget-tip{
+    display:flex;
+    gap:10px;
+    align-items:flex-start;
+    font-size:13.5px;
+    color:var(--ink-soft);
+    background:var(--surface-2);
+    border-radius:10px;
+    padding:12px 16px;
+  }
+  .budget-tip .dot{
+    flex:0 0 auto;
+    width:6px; height:6px;
+    margin-top:7px;
+    border-radius:50%;
+    background:var(--gold);
+  }
+
+  /* ---- Checklist ---- */
+  .checklist{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px 16px;
+  }
+  @media (max-width:560px){
+    .checklist{ grid-template-columns:1fr; }
+  }
+  .check-item{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:12px 14px;
+    font-size:14.5px;
+  }
+  .box{
+    flex:0 0 auto;
+    width:18px; height:18px;
+    border-radius:5px;
+    border:1.5px solid var(--line);
+  }
+  .check-item.hilite .box{ border-color:var(--accent); background:var(--accent-soft); }
+  .check-item.hilite{ border-color:var(--accent-soft); }
+
+  footer{
+    text-align:center;
+    color:var(--ink-soft);
+    font-size:12.5px;
+    padding-top:12px;
+    border-top:1px solid var(--line);
+  }
+</style>
+
+<div class="page">
+
+  <header>
+    <span class="eyebrow">Travel Itinerary</span>
+    <h1>도쿄 &amp; 하코네</h1>
+    <div class="subline">단풍 지고 첫눈 오는 계절, 도심과 온천 마을을 오가는 4박 5일</div>
+    <div class="chips">
+      <span class="chip">📅 <b>2026.12.01 (화)</b> – 2026.12.05 (토)</span>
+      <span class="chip">📍 도쿄 → 하코네 → 도쿄</span>
+      <span class="chip">🏨 Hakone Suimeisou Hotel</span>
+      <span class="chip">💴 예산 <b>150만원</b></span>
+    </div>
+  </header>
+
+  <!-- ===================== LIST VIEW ===================== -->
+  <div id="view-list">
+
+    <section>
+      <div class="section-head">
+        <h2>일정</h2>
+        <span class="section-note">확정 2일 · 자유일정 3일 · 클릭하면 상세 일정</span>
+      </div>
+
+      <div class="timeline">
+
+        <div class="day open">
+          <button class="day-summary" data-view="day-1" onclick="showDay(1)">
+            <div class="day-top">
+              <div class="day-title">
+                <span class="day-num nums">DAY 1</span>
+                <span class="day-date nums">12.1 (화)</span>
+              </div>
+              <span class="status open">자유일정</span>
+            </div>
+            <div class="day-summary-body">
+              <span class="day-summary-text muted">인천 → 도쿄 도착, 숙소 체크인</span>
+              <span class="day-arrow">자세히 →</span>
+            </div>
+          </button>
+        </div>
+
+        <div class="day open">
+          <button class="day-summary" data-view="day-2" onclick="showDay(2)">
+            <div class="day-top">
+              <div class="day-title">
+                <span class="day-num nums">DAY 2</span>
+                <span class="day-date nums">12.2 (수)</span>
+              </div>
+              <span class="status open">자유일정</span>
+            </div>
+            <div class="day-summary-body">
+              <span class="day-summary-text">아키하바라 관광 &amp; 쇼핑</span>
+              <span class="day-arrow">자세히 →</span>
+            </div>
+          </button>
+        </div>
+
+        <div class="day open">
+          <button class="day-summary" data-view="day-3" onclick="showDay(3)">
+            <div class="day-top">
+              <div class="day-title">
+                <span class="day-num nums">DAY 3</span>
+                <span class="day-date nums">12.3 (목)</span>
+              </div>
+              <span class="status open">자유일정</span>
+            </div>
+            <div class="day-summary-body">
+              <span class="day-summary-text muted">도쿄 시내, 세부 계획 미정</span>
+              <span class="day-arrow">자세히 →</span>
+            </div>
+          </button>
+        </div>
+
+        <div class="day confirmed">
+          <button class="day-summary" data-view="day-4" onclick="showDay(4)">
+            <div class="day-top">
+              <div class="day-title">
+                <span class="day-num nums">DAY 4</span>
+                <span class="day-date nums">12.4 (금)</span>
+              </div>
+              <span class="status confirmed">확정</span>
+            </div>
+            <div class="day-summary-body">
+              <span class="day-summary-text">하코네 이동 · 관광 · 스이메이소 호텔 숙박</span>
+              <span class="day-arrow">자세히 →</span>
+            </div>
+          </button>
+        </div>
+
+        <div class="day confirmed">
+          <button class="day-summary" data-view="day-5" onclick="showDay(5)">
+            <div class="day-top">
+              <div class="day-title">
+                <span class="day-num nums">DAY 5</span>
+                <span class="day-date nums">12.5 (토)</span>
+              </div>
+              <span class="status confirmed">확정</span>
+            </div>
+            <div class="day-summary-body">
+              <span class="day-summary-text">하코네 → 도쿄 복귀, 식사 후 귀국</span>
+              <span class="day-arrow">자세히 →</span>
+            </div>
+          </button>
+        </div>
+
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>예산</h2>
+        <span class="section-note">세부 항목 미정</span>
+      </div>
+      <div class="budget-hero">
+        <div>
+          <div class="budget-label">총 예산</div>
+          <div class="budget-amount nums">1,500,000<span>원</span></div>
+        </div>
+        <div class="budget-per">
+          1인 4박 기준
+          <b class="nums">300,000원 / 일</b>
+        </div>
+      </div>
+      <div class="budget-tip">
+        <span class="dot"></span>
+        <span>숙박·교통·식비 항목별 배분은 아직 정해지지 않았어요. 항목이 정해지면 알려주시면 표로 정리해 드릴게요.</span>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>준비물 체크리스트</h2>
+        <span class="section-note">12월 · 하코네 온천 포함</span>
+      </div>
+      <div class="checklist">
+        <div class="check-item"><span class="box"></span>여권 &amp; 항공권 e-티켓</div>
+        <div class="check-item"><span class="box"></span>엔화 환전 / 트래블카드</div>
+        <div class="check-item"><span class="box"></span>eSIM 또는 포켓와이파이</div>
+        <div class="check-item hilite"><span class="box"></span>료칸 예약 확인서</div>
+        <div class="check-item hilite"><span class="box"></span>온천용 소형 수건</div>
+        <div class="check-item hilite"><span class="box"></span>방한 외투 (하코네 산간, 도쿄보다 추움)</div>
+        <div class="check-item"><span class="box"></span>편한 운동화</div>
+        <div class="check-item"><span class="box"></span>보조배터리 &amp; 충전기</div>
+        <div class="check-item"><span class="box"></span>상비약</div>
+        <div class="check-item"><span class="box"></span>여행자 보험</div>
+        <div class="check-item"><span class="box"></span>캐리어 무게 확인</div>
+        <div class="check-item"><span class="box"></span>숙소 주소 캡처 (오프라인 대비)</div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ===================== DAY 1 DETAIL ===================== -->
+  <div id="view-day-1" class="view-detail" hidden>
+    <button class="back-link" onclick="showList()">← 목록으로</button>
+    <div class="detail-head">
+      <h2>Day 1 · 12.1 (화)</h2>
+      <span class="status open">자유일정</span>
+    </div>
+    <div class="detail-sub">인천 → 도쿄, 도착일</div>
+    <div class="day-card">
+      <div class="day-body">
+        <p class="muted">인천공항 출발 → 나리타/하네다 공항 도착 → 숙소 체크인.</p>
+      </div>
+      <div class="detail-note">
+        <span class="dot"></span>
+        <span>세부 계획이 아직 없어요. 항공편 시간이나 저녁 계획이 정해지면 알려주세요.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== DAY 2 DETAIL ===================== -->
+  <div id="view-day-2" class="view-detail" hidden>
+    <button class="back-link" onclick="showList()">← 목록으로</button>
+    <div class="detail-head">
+      <h2>Day 2 · 12.2 (수)</h2>
+      <span class="status open">자유일정</span>
+    </div>
+    <div class="detail-sub">아키하바라 중심 관광 &amp; 쇼핑 코스</div>
+    <div class="day-card">
+      <div class="day-body">
+        <ul class="plan-list">
+          <li><span class="plan-time">10:00</span><span>아키하바라 전자상가 &amp; 라디오 카이칸 — 레트로 게임(Super Potato), 피규어·프라모델(Kotobukiya, Volks)</span></li>
+          <li><span class="plan-time">11:00</span><span>만다라케 콤플렉스 / 애니메이트 아키하바라 — 중고 만화·굿즈·피규어 쇼핑</span></li>
+          <li><span class="plan-time">12:30</span><span>간다묘진 신사 (도보 10분) — 애니 성지순례 명소, 오마모리</span></li>
+          <li><span class="plan-time">13:00</span><span>점심 — 간다 야부소바 또는 아키하바라 테마 레스토랑(건담카페 등)</span></li>
+          <li><span class="plan-time">14:30</span><span>요도바시 카메라 아키바 — 대형 가전 쇼핑, 옥상 전망</span></li>
+          <li><span class="plan-time">15:30</span><span>진보초 헌책방 거리 (전철·도보 15분) — 세계 최대 규모 고서점가</span></li>
+          <li><span class="plan-time">17:00</span><span>메이드카페 체험 (예약 권장)</span></li>
+          <li><span class="plan-time">18:30</span><span>오락실(GiGO) &amp; 저녁식사</span></li>
+          <li><span class="plan-time">20:00</span><span>돈키호테 아키하바라점 — 기념품 쇼핑 마무리</span></li>
+        </ul>
+      </div>
+      <div class="detail-note">
+        <span class="dot"></span>
+        <span>메이드카페 예약 여부나 피규어·게임 쇼핑 비중에 따라 순서를 조정할 수 있어요.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== DAY 3 DETAIL ===================== -->
+  <div id="view-day-3" class="view-detail" hidden>
+    <button class="back-link" onclick="showList()">← 목록으로</button>
+    <div class="detail-head">
+      <h2>Day 3 · 12.3 (목)</h2>
+      <span class="status open">자유일정</span>
+    </div>
+    <div class="detail-sub">도쿄 시내</div>
+    <div class="day-card">
+      <div class="day-body">
+        <p class="muted">세부 계획 미정.</p>
+      </div>
+      <div class="detail-note">
+        <span class="dot"></span>
+        <span>가고 싶은 지역이나 하고 싶은 활동을 알려주시면 코스를 짜드릴게요.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== DAY 4 DETAIL ===================== -->
+  <div id="view-day-4" class="view-detail" hidden>
+    <button class="back-link" onclick="showList()">← 목록으로</button>
+    <div class="detail-head">
+      <h2>Day 4 · 12.4 (금)</h2>
+      <span class="status confirmed">확정</span>
+    </div>
+    <div class="detail-sub">도쿄 → 하코네, 관광하며 이동</div>
+    <div class="day-card">
+      <div class="day-body">
+        <ul class="plan-list">
+          <li><span class="plan-time">08:21</span><span>신주쿠 → 하코네유모토, 로망스카 (약 1시간 40분)</span></li>
+          <li><span class="plan-time">이동</span><span>하코네유모토 → 고라, 등산열차 (약 40분, 지그재그 산길)</span></li>
+          <li><span class="plan-time">이동</span><span>고라 → 소운잔, 케이블카·푸니쿨라 (약 15분)</span></li>
+          <li><span class="plan-time">이동</span><span>소운잔 → 오와쿠다니, 로프웨이 · 유황가스 화산경관, 흑계란 시식</span></li>
+          <li><span class="plan-time">이동</span><span>오와쿠다니 → 도겐다이, 대행버스 (로프웨이 점검 시 프리패스로 무료)</span></li>
+          <li><span class="plan-time">이동</span><span>도겐다이 → 하코네마치코, 하코네 해적선 (아시노코 호수 경관)</span></li>
+          <li><span class="plan-time">도보 37분</span><span>하코네마치코 → 모토하코네, 하코네신사 &amp; 평화의 토리이</span></li>
+          <li><span class="plan-time">도보 30분</span><span>모토하코네 → 하코네유모토, 텐잔온천 (프리패스 100엔 할인)</span></li>
+          <li><span class="plan-time">숙박</span><span>Hakone Suimeisou Hotel 체크인 &amp; 1박</span></li>
+        </ul>
+      </div>
+      <div class="detail-note">
+        <span class="dot"></span>
+        <span>루트 출처: <a href="https://gall.dcinside.com/mgallery/board/view/?id=nokanto&no=344223" target="_blank" rel="noopener">디시인사이드 참고글</a>. 하코네 프리패스 이용 기준 동선입니다.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== DAY 5 DETAIL ===================== -->
+  <div id="view-day-5" class="view-detail" hidden>
+    <button class="back-link" onclick="showList()">← 목록으로</button>
+    <div class="detail-head">
+      <h2>Day 5 · 12.5 (토)</h2>
+      <span class="status confirmed">확정</span>
+    </div>
+    <div class="detail-sub">하코네 → 도쿄 → 귀국</div>
+    <div class="day-card">
+      <div class="day-body">
+        <ul class="plan-list">
+          <li><span class="plan-time">이동</span><span>하코네 → 도쿄 복귀, 로망스카</span></li>
+          <li><span class="plan-time">식사</span><span>점심 겸 저녁 식사</span></li>
+          <li><span class="plan-time">귀국</span><span>도쿄 → 인천 출발</span></li>
+        </ul>
+      </div>
+      <div class="detail-note">
+        <span class="dot"></span>
+        <span>식사 장소와 항공편 시간이 정해지면 알려주세요.</span>
+      </div>
+    </div>
+  </div>
+
+  <footer>도쿄 · 하코네 여행 — 2026.12.01–12.05</footer>
+
+</div>
+
+<script>
+  var VIEWS = ['view-list','view-day-1','view-day-2','view-day-3','view-day-4','view-day-5'];
+
+  function showView(id){
+    VIEWS.forEach(function(v){
+      document.getElementById(v).hidden = (v !== id);
+    });
+    window.scrollTo({top:0, behavior:'instant' in window ? 'instant' : 'auto'});
+    history.replaceState(null, '', id === 'view-list' ? '#' : '#' + id.replace('view-',''));
+  }
+  function showDay(n){ showView('view-day-' + n); }
+  function showList(){ showView('view-list'); }
+
+  (function init(){
+    var hash = location.hash.replace('#','');
+    if (hash && VIEWS.indexOf('view-' + hash) !== -1) {
+      showView('view-' + hash);
+    }
+  })();
+</script>
