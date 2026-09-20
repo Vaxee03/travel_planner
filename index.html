@@ -328,13 +328,13 @@
   function renderHeader(){
     return (
       '<header class="top">' +
-        (ui.screen === "trip" ? '<button class="back-link" data-action="go-home" style="margin-bottom:0;">← 여행 목록으로</button>' : '') +
         '<span class="eyebrow">Travel Planner</span>' +
         '<div class="top-row">' +
           '<div>' +
             '<h1>여행 플래너</h1>' +
             '<div class="subline">여러 여행을 관리하고, 다녀온 여행엔 후기와 사진을 남겨보세요.</div>' +
           '</div>' +
+          (ui.screen === "trip" ? '<button class="back-link" data-action="go-home" style="margin-bottom:0;">← 여행 목록으로</button>' : '') +
         '</div>' +
       '</header>'
     );
