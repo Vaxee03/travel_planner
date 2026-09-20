@@ -328,6 +328,7 @@
   function renderHeader(){
     return (
       '<header class="top">' +
+        (ui.screen === "trip" ? '<button class="back-link" data-action="go-home" style="margin-bottom:0;">← 여행 목록으로</button>' : '') +
         '<span class="eyebrow">Travel Planner</span>' +
         '<div class="top-row">' +
           '<div>' +
@@ -393,8 +394,7 @@
   function renderTrip(trip){
     var st = tripStatus(trip);
     var dday = ddayLabel(trip);
-    var html = '<button class="back-link" data-action="go-home">← 여행 목록으로</button>';
-    html += '<div class="trip-head">' +
+    var html = '<div class="trip-head">' +
       '<div class="trip-head-top">' +
         '<h1>' + esc(trip.title) + '</h1>' +
         '<div class="btn-row">' +
@@ -403,11 +403,9 @@
         '</div>' +
       '</div>' +
       '<div class="chips">' +
-        '<span class="chip">' + '<span class="status ' + st + '">' + statusLabel(st) + '</span></span>' +
         (dday ? '<span class="chip"><b>' + esc(dday) + '</b></span>' : '') +
-        (trip.destination ? '<a class="chip" href="' + mapUrl(trip.destination) + '" target="_blank" rel="noopener">📍 ' + esc(trip.destination) + ' · 지도</a>' : '<span class="chip">📍 -</span>') +
+        '<span class="chip">📍 ' + esc(trip.destination || "-") + '</span>' +
         '<span class="chip nums">📅 ' + esc(trip.startDate) + ' – ' + esc(trip.endDate) + '</span>' +
-        (trip.travelers ? '<span class="chip">👥 <b>' + esc(trip.travelers) + '명</b></span>' : '') +
         (trip.budgetTotal ? '<span class="chip">💴 예산 <b>' + fmtMoney(trip.budgetTotal) + '원</b></span>' : '') +
       '</div>' +
     '</div>';
