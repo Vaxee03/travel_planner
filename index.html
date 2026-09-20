@@ -269,6 +269,21 @@
   function statusLabel(s){
     return { upcoming:"예정", ongoing:"여행중", completed:"완료" }[s] || s;
   }
+  function mapUrl(q){ return "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(q); }
+  function ddayLabel(t){
+    var st = tripStatus(t);
+    if(st === "completed" || !t.startDate || !t.endDate) return null;
+    var today = new Date(todayStr() + "T00:00:00");
+    var start = new Date(t.startDate + "T00:00:00");
+    if(st === "ongoing"){
+      var end = new Date(t.endDate + "T00:00:00");
+      var totalDays = Math.round((end-start)/86400000) + 1;
+      var dayNum = Math.round((today-start)/86400000) + 1;
+      return dayNum + "일차 / " + totalDays + "일";
+    }
+    var diff = Math.round((start-today)/86400000);
+    return diff === 0 ? "D-DAY" : ("D-" + diff);
+  }
   function getTrip(id){
     for(var i=0;i<trips.length;i++) if(trips[i].id === id) return trips[i];
     return null;
@@ -323,6 +338,9 @@
     var html = '<section><div class="section-head"><h2>내 여행</h2>' +
       '<button class="btn btn-primary" data-action="add-trip">+ 새 여행</button></div>';
 
+    html += '<div class="note" style="margin-bottom:18px;"><span class="dot"></span>' +
+      '<span>동행자와 함께 계획하려면 화면 위 공유 버튼으로 편집 권한을 초대하세요. 초대된 사람은 같은 여행 목록을 실시간으로 보고 수정할 수 있어요.</span></div>';
+
     if(trips.length === 0){
       html += '<div class="empty">아직 등록된 여행이 없어요. "새 여행"으로 첫 여행을 만들어보세요.</div>';
       html += '<div class="note" style="margin-top:14px;"><span class="dot"></span><span>' +
@@ -338,10 +356,14 @@
       html += '<div class="trip-grid">';
       sorted.forEach(function(t){
         var st = tripStatus(t);
+        var dday = ddayLabel(t);
         html += '<button class="trip-card" data-action="open-trip" data-id="' + t.id + '">' +
           '<div class="trip-card-top">' +
             '<span class="trip-card-title">' + esc(t.title) + '</span>' +
-            '<span class="status ' + st + '">' + statusLabel(st) + '</span>' +
+            '<span class="btn-row" style="align-items:center;">' +
+              (dday ? '<span class="food-card-tag nums">' + esc(dday) + '</span>' : '') +
+              '<span class="status ' + st + '">' + statusLabel(st) + '</span>' +
+            '</span>' +
           '</div>' +
           '<div class="trip-card-meta">' +
             '<span>📍 ' + esc(t.destination || "-") + '</span>' +
@@ -359,6 +381,7 @@
 
   function renderTrip(trip){
     var st = tripStatus(trip);
+    var dday = ddayLabel(trip);
     var html = '<button class="back-link" data-action="go-home">← 여행 목록으로</button>';
     html += '<div class="trip-head">' +
       '<div class="trip-head-top">' +
@@ -370,7 +393,8 @@
       '</div>' +
       '<div class="chips">' +
         '<span class="chip">' + '<span class="status ' + st + '">' + statusLabel(st) + '</span></span>' +
-        '<span class="chip">📍 ' + esc(trip.destination || "-") + '</span>' +
+        (dday ? '<span class="chip"><b>' + esc(dday) + '</b></span>' : '') +
+        (trip.destination ? '<a class="chip" href="' + mapUrl(trip.destination) + '" target="_blank" rel="noopener">📍 ' + esc(trip.destination) + ' · 지도</a>' : '<span class="chip">📍 -</span>') +
         '<span class="chip nums">📅 ' + esc(trip.startDate) + ' – ' + esc(trip.endDate) + '</span>' +
         (trip.travelers ? '<span class="chip">👥 <b>' + esc(trip.travelers) + '명</b></span>' : '') +
         (trip.budgetTotal ? '<span class="chip">💴 예산 <b>' + fmtMoney(trip.budgetTotal) + '원</b></span>' : '') +
@@ -451,7 +475,9 @@
       items.forEach(function(it, iidx){
         html += '<li>' +
           (it.time ? '<span class="plan-time">' + esc(it.time) + '</span>' : '<span class="plan-time"></span>') +
-          '<span class="plan-text">' + esc(it.text) + '</span>' +
+          '<span class="plan-text">' + esc(it.text) +
+            ' <a href="' + mapUrl(it.text + " " + (trip.destination||"")) + '" target="_blank" rel="noopener" style="font-size:12px;white-space:nowrap;">🗺️ 지도</a>' +
+          '</span>' +
           '<span class="plan-actions">' +
             '<button class="btn-ghost btn-sm" data-action="edit-item" data-idx="' + iidx + '">수정</button>' +
             '<button class="btn-ghost btn-sm btn-danger" data-action="delete-item" data-idx="' + iidx + '">삭제</button>' +
@@ -520,6 +546,13 @@
       html += '</div>';
     }
     html += '</section>';
+
+    html += '<section><div class="section-head"><h2>환율 계산기</h2><span class="section-note">참고용 · 수동 입력 환율</span></div>' +
+      '<div class="card"><div class="field-row">' +
+        '<div class="field"><label>엔화 금액 (¥)</label><input type="number" id="fx-jpy" placeholder="예: 10000"></div>' +
+        '<div class="field"><label>환율 (100엔당 원)</label><input type="number" id="fx-rate" value="900"></div>' +
+      '</div><div style="margin-top:4px;font-size:15px;">≈ <b id="fx-result" class="nums">0</b>원</div></div></section>';
+
     return html;
   }
 
@@ -825,6 +858,19 @@
       });
       render();
       return;
+    }
+  });
+
+  document.addEventListener("input", function(e){
+    if(e.target && (e.target.id === "fx-jpy" || e.target.id === "fx-rate")){
+      var jpyEl = document.getElementById("fx-jpy");
+      var rateEl = document.getElementById("fx-rate");
+      var resultEl = document.getElementById("fx-result");
+      if(!jpyEl || !rateEl || !resultEl) return;
+      var jpy = Number(jpyEl.value) || 0;
+      var rate = Number(rateEl.value) || 0;
+      var krw = Math.round(jpy * (rate / 100));
+      resultEl.textContent = fmtMoney(krw);
     }
   });
 
