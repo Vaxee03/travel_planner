@@ -233,6 +233,13 @@
 (function(){
   "use strict";
 
+  window.__toggleItemKind = function(v){
+    var t = document.getElementById("item-time-field");
+    var l = document.getElementById("item-label-field");
+    if(t) t.style.display = (v === "time") ? "block" : "none";
+    if(l) l.style.display = (v === "label") ? "block" : "none";
+  };
+
   var db = null, assetsNs = null, sampleNs = null, dbReady = false, dbState = "loading";
   var debugInfo = { snapshots:0, lastSize:null, lastFromCache:null, lastAt:null, manualSize:null, manualError:null, mapError:null };
   var trips = [];
@@ -270,6 +277,10 @@
     return { upcoming:"예정", ongoing:"여행중", completed:"완료" }[s] || s;
   }
   function mapUrl(q){ return "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(q); }
+  function itemKind(it){
+    if(it.kind === "time" || it.kind === "label") return it.kind;
+    return /^\d{1,2}:\d{2}$/.test(it.time||"") ? "time" : "label";
+  }
   function ddayLabel(t){
     var st = tripStatus(t);
     if(st === "completed" || !t.startDate || !t.endDate) return null;
@@ -467,28 +478,44 @@
       '</div></div>';
     html += '<div class="detail-sub">' + (d.summary ? esc(d.summary) : "세부 계획 미정") + '</div>';
 
-    html += '<div class="card"><ul class="plan-list">';
     var items = d.items || [];
-    if(items.length === 0){
-      html += '<li class="plan-text" style="color:var(--ink-soft);font-style:italic;">아직 등록된 세부 항목이 없어요.</li>';
-    } else {
-      items.forEach(function(it, iidx){
-        html += '<li>' +
-          (it.time ? '<span class="plan-time">' + esc(it.time) + '</span>' : '<span class="plan-time"></span>') +
-          '<span class="plan-text">' + esc(it.text) +
-            ' <a href="' + mapUrl(it.text + " " + (trip.destination||"")) + '" target="_blank" rel="noopener" style="font-size:12px;white-space:nowrap;">🗺️ 지도</a>' +
-          '</span>' +
-          '<span class="plan-actions">' +
-            '<button class="btn-ghost btn-sm" data-action="edit-item" data-idx="' + iidx + '">수정</button>' +
-            '<button class="btn-ghost btn-sm btn-danger" data-action="delete-item" data-idx="' + iidx + '">삭제</button>' +
-          '</span>' +
-        '</li>';
-      });
+    var timeEntries = [], labelEntries = [];
+    items.forEach(function(it, i){
+      (itemKind(it) === "time" ? timeEntries : labelEntries).push({ it:it, idx:i });
+    });
+    timeEntries.sort(function(a,b){ return (a.it.time||"").localeCompare(b.it.time||""); });
+
+    function itemLi(entry){
+      var it = entry.it, iidx = entry.idx;
+      return '<li>' +
+        (it.time ? '<span class="plan-time">' + esc(it.time) + '</span>' : '<span class="plan-time"></span>') +
+        '<span class="plan-text">' + esc(it.text) +
+          ' <a href="' + mapUrl(it.text + " " + (trip.destination||"")) + '" target="_blank" rel="noopener" style="font-size:12px;white-space:nowrap;">🗺️ 지도</a>' +
+        '</span>' +
+        '<span class="plan-actions">' +
+          '<button class="btn-ghost btn-sm" data-action="edit-item" data-idx="' + iidx + '">수정</button>' +
+          '<button class="btn-ghost btn-sm btn-danger" data-action="delete-item" data-idx="' + iidx + '">삭제</button>' +
+        '</span>' +
+      '</li>';
     }
-    html += '</ul>' +
-      '<div class="btn-row" style="margin-top:16px;">' +
-        '<button class="btn btn-sm" data-action="add-item">+ 항목 추가</button>' +
-      '</div>' +
+
+    if(items.length === 0){
+      html += '<div class="card" style="color:var(--ink-soft);font-style:italic;">아직 등록된 세부 항목이 없어요.</div>';
+    } else {
+      html += '<div class="card"><div class="section-note" style="margin-bottom:10px;">타임라인</div><ul class="plan-list">';
+      html += timeEntries.length
+        ? timeEntries.map(itemLi).join("")
+        : '<li style="color:var(--ink-soft);font-style:italic;">시간이 정해진 항목이 없어요.</li>';
+      html += '</ul></div>';
+
+      if(labelEntries.length){
+        html += '<div class="card" style="margin-top:12px;"><div class="section-note" style="margin-bottom:10px;">시간 미정 / 기타</div><ul class="plan-list">' +
+          labelEntries.map(itemLi).join("") +
+        '</ul></div>';
+      }
+    }
+    html += '<div class="btn-row" style="margin-top:16px;">' +
+      '<button class="btn btn-sm" data-action="add-item">+ 항목 추가</button>' +
     '</div>';
     return html;
   }
@@ -720,8 +747,18 @@
       var isEditI = m.type === "edit-item";
       var trip2 = getTrip(ui.tripId);
       var it = isEditI ? trip2.days[ui.dayIdx].items[m.idx] : { time:"", text:"" };
+      var kind = isEditI ? itemKind(it) : "time";
       return '<h3>' + (isEditI?"항목 수정":"항목 추가") + '</h3><form data-form="' + m.type + '">' +
-        field("time","시간/구분","text","예: 10:00 또는 이동",false,it.time) +
+        '<div class="field"><label>기준</label><div class="btn-row" style="gap:16px;">' +
+          '<label style="display:flex;align-items:center;gap:6px;font-weight:400;color:var(--ink);">' +
+            '<input type="radio" name="kind" value="time"' + (kind==="time"?" checked":"") + ' onchange="window.__toggleItemKind(this.value)"> 시간</label>' +
+          '<label style="display:flex;align-items:center;gap:6px;font-weight:400;color:var(--ink);">' +
+            '<input type="radio" name="kind" value="label"' + (kind==="label"?" checked":"") + ' onchange="window.__toggleItemKind(this.value)"> 글자</label>' +
+        '</div></div>' +
+        '<div class="field" id="item-time-field" style="display:' + (kind==="time"?"block":"none") + ';">' +
+          '<label>시간</label><input type="time" name="timeValue" value="' + esc(kind==="time"?(it.time||""):"") + '"></div>' +
+        '<div class="field" id="item-label-field" style="display:' + (kind==="label"?"block":"none") + ';">' +
+          '<label>구분 글자</label><input type="text" name="labelValue" placeholder="예: 이동, 식사, 귀국" value="' + esc(kind==="label"?(it.time||""):"") + '"></div>' +
         field("text","내용","text","예: 오와쿠다니 로프웨이",true,it.text) +
         modalActions(isEditI?"저장":"추가") + '</form>';
     }
@@ -968,14 +1005,16 @@
       var trip4 = getTrip(ui.tripId);
       var day = trip4.days[ui.dayIdx];
       day.items = day.items || [];
-      day.items.push({ time: val("time"), text: val("text") });
+      var kind4 = val("kind") === "label" ? "label" : "time";
+      day.items.push({ kind: kind4, time: kind4==="time" ? val("timeValue") : val("labelValue"), text: val("text") });
       saveTrip(trip4); closeModal();
       return;
     }
     if(type === "edit-item"){
       var trip5 = getTrip(ui.tripId);
       var it = trip5.days[ui.dayIdx].items[ui.modal.idx];
-      it.time = val("time"); it.text = val("text");
+      var kind5 = val("kind") === "label" ? "label" : "time";
+      it.kind = kind5; it.time = kind5==="time" ? val("timeValue") : val("labelValue"); it.text = val("text");
       saveTrip(trip5); closeModal();
       return;
     }
