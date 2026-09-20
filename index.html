@@ -414,6 +414,7 @@
     html += '<div class="tabbar">' +
       tabBtn("itinerary","일정") + tabBtn("budget","예산") + tabBtn("checklist","체크리스트") + tabBtn("food","맛집 추천") +
       '<button class="tab' + (ui.tab==="review"?" active":"") + '" ' + (canReview?'':'disabled') +
+        (canReview?'':' title="아직 완료되지 않은 일정입니다"') +
         ' data-action="set-tab" data-tab="review">후기' + (canReview?'':' 🔒') + '</button>' +
     '</div>';
 
