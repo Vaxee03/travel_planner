@@ -249,7 +249,8 @@
     if(l) l.style.display = (v === "label") ? "block" : "none";
   };
 
-  var db = null, assetsNs = null, sampleNs = null, dbReady = false, dbState = "loading";
+  var db = null, assetsNs = null, sampleNs = null, downloadsNs = null, dbReady = false, dbState = "loading";
+  var exportState = { loading:false, error:null };
   var debugInfo = { snapshots:0, lastSize:null, lastFromCache:null, lastAt:null, manualSize:null, manualError:null, mapError:null };
   var trips = [];
   var ui = { screen:'home', tripId:null, tab:'itinerary', dayIdx:null, modal:null };
@@ -309,6 +310,32 @@
     return null;
   }
   function cloneTrip(t){ return JSON.parse(JSON.stringify(t)); }
+
+  function buildItineraryText(trip){
+    var lines = [];
+    lines.push(trip.title || "여행 일정");
+    lines.push((trip.destination||"-") + " · " + (trip.startDate||"") + " ~ " + (trip.endDate||"") + (trip.travelers ? " · " + trip.travelers + "명" : ""));
+    lines.push("");
+    (trip.days||[]).forEach(function(d){
+      lines.push("[" + fmtDate(d.date) + "] " + (d.summary || (d.status==="confirmed"?"확정":"자유일정")));
+      var timeEntries = [], labelEntries = [];
+      (d.items||[]).forEach(function(it){
+        (itemKind(it)==="time" ? timeEntries : labelEntries).push(it);
+      });
+      timeEntries.sort(function(a,b){ return (a.time||"").localeCompare(b.time||""); });
+      timeEntries.concat(labelEntries).forEach(function(it){
+        lines.push("  " + (it.time ? "- " + it.time + " " : "- ") + it.text);
+      });
+      lines.push("");
+    });
+    if(trip.bookings && trip.bookings.length){
+      lines.push("[예약 정보]");
+      trip.bookings.forEach(function(b){
+        lines.push("  - (" + (b.type||"기타") + ") " + b.name + (b.confirmNumber?" / 예약번호: "+b.confirmNumber:"") + (b.link?" / "+b.link:""));
+      });
+    }
+    return lines.join("\n");
+  }
 
   function saveTrip(trip){
     var data = cloneTrip(trip);
@@ -421,7 +448,7 @@
 
     var canReview = st === "completed";
     html += '<div class="tabbar">' +
-      tabBtn("itinerary","일정") + tabBtn("budget","예산") + tabBtn("checklist","체크리스트") + tabBtn("food","맛집 추천") +
+      tabBtn("itinerary","일정") + tabBtn("budget","예산") + tabBtn("checklist","체크리스트") + tabBtn("bookings","예약정보") + tabBtn("food","맛집 추천") +
       '<span class="tab-tooltip-wrap">' +
         '<button class="tab' + (ui.tab==="review"?" active":"") + '" ' + (canReview?'':'disabled') +
           ' data-action="set-tab" data-tab="review">후기' + (canReview?'':' 🔒') + '</button>' +
@@ -432,6 +459,7 @@
     if(ui.tab === "itinerary") html += renderItinerary(trip);
     else if(ui.tab === "budget") html += renderBudget(trip);
     else if(ui.tab === "checklist") html += renderChecklist(trip);
+    else if(ui.tab === "bookings") html += renderBookings(trip);
     else if(ui.tab === "food") html += renderFood(trip);
     else if(ui.tab === "review") html += renderReview(trip, canReview);
 
@@ -448,7 +476,16 @@
       return renderDayDetail(trip, ui.dayIdx);
     }
     var html = '<section><div class="section-head"><h2>일자별 일정</h2>' +
-      '<button class="btn btn-primary btn-sm" data-action="add-day" data-id="' + trip.id + '">+ 날짜 추가</button></div>';
+      '<span class="btn-row">' +
+        '<button class="btn btn-sm" data-action="export-itinerary" ' + (exportState.loading?'disabled':'') + '>' +
+          (exportState.loading?'내보내는 중…':'📤 내보내기') +
+        '</button>' +
+        '<button class="btn btn-primary btn-sm" data-action="add-day" data-id="' + trip.id + '">+ 날짜 추가</button>' +
+      '</span></div>';
+
+    if(exportState.error){
+      html += '<div class="note"><span class="dot"></span><span>' + esc(exportState.error) + '</span></div>';
+    }
 
     if(days.length === 0){
       html += '<div class="empty">아직 일정이 없어요. "날짜 추가"로 첫 날짜를 만들어보세요.</div></section>';
@@ -607,6 +644,34 @@
         '<button class="box-btn" data-action="toggle-check" data-idx="' + idx + '"><span class="box">' + (it.done?"✓":"") + '</span></button>' +
         '<span class="check-text">' + esc(it.text) + '</span>' +
         '<button class="btn-ghost btn-sm btn-danger" data-action="delete-check" data-idx="' + idx + '">삭제</button>' +
+      '</div>';
+    });
+    html += '</div></section>';
+    return html;
+  }
+
+  function renderBookings(trip){
+    var items = trip.bookings || [];
+    var html = '<section><div class="section-head"><h2>예약 정보</h2>' +
+      '<button class="btn btn-primary btn-sm" data-action="add-booking">+ 예약 추가</button></div>';
+    if(items.length === 0){
+      html += '<div class="empty">등록된 예약 정보가 없어요. 항공권/숙소 예약번호를 저장해보세요.</div></section>';
+      return html;
+    }
+    html += '<div class="food-results">';
+    items.forEach(function(b, idx){
+      html += '<div class="food-card">' +
+        '<div class="food-card-top">' +
+          '<span class="food-card-name">' + esc(b.name || "(이름 없음)") + '</span>' +
+          '<span class="food-card-tag">' + esc(b.type || "기타") + '</span>' +
+        '</div>' +
+        (b.confirmNumber ? '<div class="food-card-why">예약번호: <b class="nums" style="color:var(--ink);">' + esc(b.confirmNumber) + '</b></div>' : '') +
+        (b.memo ? '<div class="food-card-why">' + esc(b.memo) + '</div>' : '') +
+        (b.link ? '<div style="margin-top:6px;"><a href="' + esc(b.link) + '" target="_blank" rel="noopener">🔗 예약 확인 / 체크인 링크</a></div>' : '') +
+        '<div class="btn-row" style="margin-top:10px;">' +
+          '<button class="btn btn-sm" data-action="edit-booking" data-idx="' + idx + '">수정</button>' +
+          '<button class="btn btn-sm btn-danger" data-action="delete-booking" data-idx="' + idx + '">삭제</button>' +
+        '</div>' +
       '</div>';
     });
     html += '</div></section>';
@@ -784,6 +849,22 @@
         field("text","항목","text","예: 온천용 수건",true) +
         modalActions("추가") + '</form>';
     }
+    if(m.type === "add-booking" || m.type === "edit-booking"){
+      var isEditB = m.type === "edit-booking";
+      var trip9 = getTrip(ui.tripId);
+      var bk = isEditB ? trip9.bookings[m.idx] : { type:"항공권", name:"", confirmNumber:"", link:"", memo:"" };
+      return '<h3>' + (isEditB?"예약 정보 수정":"예약 정보 추가") + '</h3><form data-form="' + m.type + '">' +
+        '<div class="field"><label>종류</label><select name="type">' +
+          ["항공권","숙소","기타"].map(function(t){
+            return '<option value="' + t + '"' + (bk.type===t?" selected":"") + '>' + t + '</option>';
+          }).join("") +
+        '</select></div>' +
+        field("name","이름","text","예: 인천→나리타 KE001 / 스이메이소 호텔",true,bk.name) +
+        field("confirmNumber","예약번호","text","예: ABC123",false,bk.confirmNumber) +
+        field("link","링크","text","예: 체크인/예약 확인 URL",false,bk.link) +
+        field("memo","메모","text","선택",false,bk.memo) +
+        modalActions(isEditB?"저장":"추가") + '</form>';
+    }
     if(m.type === "edit-review"){
       var trip3 = getTrip(ui.tripId);
       var rv = trip3.review || {text:""};
@@ -872,8 +953,33 @@
         var tripI = getTrip(ui.tripId);
         tripI.days[ui.dayIdx].items.splice(m.idx,1);
         saveTrip(tripI);
+      } else if(m.onYes === "delete-booking"){
+        var tripBk = getTrip(ui.tripId);
+        tripBk.bookings.splice(m.idx,1);
+        saveTrip(tripBk);
       }
       closeModal();
+      return;
+    }
+    if(action === "add-booking"){ openModal("add-booking"); return; }
+    if(action === "edit-booking"){ openModal("edit-booking", { idx:Number(idx) }); return; }
+    if(action === "delete-booking"){
+      openModal("confirm", { message:"이 예약 정보를 삭제할까요?", onYes:"delete-booking", idx:Number(idx) });
+      return;
+    }
+    if(action === "export-itinerary"){
+      var tripE = getTrip(ui.tripId);
+      if(!tripE) return;
+      if(!downloadsNs){ exportState.error = "이 화면에서는 내보내기 기능을 사용할 수 없어요."; render(); return; }
+      exportState.loading = true; exportState.error = null; render();
+      var text = buildItineraryText(tripE);
+      downloadsNs.save({ filename: tripE.title + " 일정.txt", data: text }).then(function(){
+        exportState.loading = false; render();
+      }).catch(function(err){
+        exportState.loading = false;
+        exportState.error = (err && err.code === "declined") ? null : "내보내기에 실패했어요. 잠시 후 다시 시도해주세요.";
+        render();
+      });
       return;
     }
     if(action === "add-budget"){ openModal("add-budget"); return; }
@@ -953,7 +1059,7 @@
         startDate: val("startDate"), endDate: val("endDate"),
         travelers: Number(val("travelers")) || 1,
         budgetTotal: Number(val("budgetTotal")) || 0,
-        days: [], budgetItems: [],
+        days: [], budgetItems: [], bookings: [],
         checklist: JSON.parse(JSON.stringify(DEFAULT_CHECKLIST)),
         review: { text:"", photoIds:[] },
         createdAt: new Date().toISOString()
@@ -1049,6 +1155,20 @@
       saveTrip(trip8); closeModal();
       return;
     }
+    if(type === "add-booking"){
+      var trip9 = getTrip(ui.tripId);
+      trip9.bookings = trip9.bookings || [];
+      trip9.bookings.push({ type: val("type"), name: val("name"), confirmNumber: val("confirmNumber"), link: val("link"), memo: val("memo") });
+      saveTrip(trip9); closeModal();
+      return;
+    }
+    if(type === "edit-booking"){
+      var trip10 = getTrip(ui.tripId);
+      var bk = trip10.bookings[ui.modal.idx];
+      bk.type = val("type"); bk.name = val("name"); bk.confirmNumber = val("confirmNumber"); bk.link = val("link"); bk.memo = val("memo");
+      saveTrip(trip10); closeModal();
+      return;
+    }
   });
 
   /* ---------------- init ---------------- */
@@ -1072,6 +1192,7 @@
             data.id = doc.id;
             data.days = data.days || [];
             data.budgetItems = data.budgetItems || [];
+            data.bookings = data.bookings || [];
             data.checklist = data.checklist || [];
             data.review = data.review || { text:"", photoIds:[] };
             return data;
@@ -1089,6 +1210,7 @@
     }).catch(function(){ dbReady = false; dbState = "unavailable"; render(); });
     window.claude.use("assets").then(function(ns){ assetsNs = ns; render(); });
     window.claude.use("sample").then(function(ns){ sampleNs = ns; render(); });
+    window.claude.use("downloads").then(function(ns){ downloadsNs = ns; render(); });
   })();
 })();
 </script>
