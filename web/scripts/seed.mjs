@@ -30,7 +30,8 @@ if (!firebaseConfig.apiKey) {
 }
 
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+const databaseId = process.env.VITE_FIREBASE_DATABASE_ID;
+const db = databaseId ? getFirestore(app, databaseId) : getFirestore(app);
 const auth = getAuth(app);
 
 const TRIPS = [
