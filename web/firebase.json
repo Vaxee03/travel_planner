@@ -5,6 +5,7 @@
     "rewrites": [{ "source": "**", "destination": "/index.html" }]
   },
   "firestore": {
+    "database": "travelplanner",
     "rules": "firestore.rules"
   },
   "storage": {
