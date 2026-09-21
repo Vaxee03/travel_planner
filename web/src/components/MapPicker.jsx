@@ -44,22 +44,39 @@ export default function MapPicker({ initialLocation, onPick, onClose }) {
 
   if (!apiKey) {
     return (
-      <div className="note">
-        <span className="dot" />
-        <span>Google Maps API 키가 설정되지 않았어요. web/.env.local에 VITE_GOOGLE_MAPS_API_KEY를 넣어주세요.</span>
+      <div>
+        <div className="note">
+          <span className="dot" />
+          <span>Google Maps API 키가 설정되지 않았어요. web/.env.local에 VITE_GOOGLE_MAPS_API_KEY를 넣어주세요.</span>
+        </div>
+        <div className="modal-actions">
+          <button type="button" className="btn" onClick={onClose}>닫기</button>
+        </div>
       </div>
     );
   }
   if (loadError) {
     return (
-      <div className="note">
-        <span className="dot" />
-        <span>지도를 불러오지 못했어요: {String(loadError.message || loadError)}</span>
+      <div>
+        <div className="note">
+          <span className="dot" />
+          <span>지도를 불러오지 못했어요: {String(loadError.message || loadError)}</span>
+        </div>
+        <div className="modal-actions">
+          <button type="button" className="btn" onClick={onClose}>닫기</button>
+        </div>
       </div>
     );
   }
   if (!isLoaded) {
-    return <div className="empty">지도를 불러오는 중…</div>;
+    return (
+      <div>
+        <div className="empty">지도를 불러오는 중…</div>
+        <div className="modal-actions">
+          <button type="button" className="btn" onClick={onClose}>취소</button>
+        </div>
+      </div>
+    );
   }
 
   return (

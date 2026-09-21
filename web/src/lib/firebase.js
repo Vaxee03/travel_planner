@@ -17,7 +17,10 @@ export const firebaseReady = Boolean(firebaseConfig.apiKey && firebaseConfig.pro
 let app, db, storage, auth;
 if (firebaseReady) {
   app = initializeApp(firebaseConfig);
-  db = getFirestore(app);
+  // Named Firestore database (Firebase console lets you create one with a
+  // custom id instead of "(default)" — set VITE_FIREBASE_DATABASE_ID if so).
+  const databaseId = import.meta.env.VITE_FIREBASE_DATABASE_ID;
+  db = databaseId ? getFirestore(app, databaseId) : getFirestore(app);
   storage = getStorage(app);
   auth = getAuth(app);
 } else {

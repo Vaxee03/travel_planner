@@ -4,7 +4,7 @@
 
 import {
   collection, doc, onSnapshot, setDoc, addDoc, deleteDoc, updateDoc,
-  arrayUnion, serverTimestamp,
+  arrayUnion, serverTimestamp, query, where,
 } from "firebase/firestore";
 import {
   ref, uploadBytes, getDownloadURL, deleteObject,
@@ -15,12 +15,15 @@ import { emptyTrip } from "./utils";
 const tripsCol = () => collection(db, "trips");
 
 export function subscribeTrips(uid, onChange, onError) {
+  // The where() clause is required, not just an optimization: Firestore
+  // rejects an entire unfiltered list query if it can't statically prove
+  // every possible result satisfies the security rule, even when every
+  // document actually in the collection would pass. Filtering here on the
+  // same field the rule checks (memberIds) is what makes the rule provable.
+  const q = query(tripsCol(), where("memberIds", "array-contains", uid));
   return onSnapshot(
-    tripsCol(),
-    (snap) => {
-      const all = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      onChange(all.filter((t) => Array.isArray(t.memberIds) && t.memberIds.includes(uid)));
-    },
+    q,
+    (snap) => onChange(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
     onError
   );
 }
