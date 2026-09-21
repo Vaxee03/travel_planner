@@ -4,8 +4,14 @@
     {
       "name": "travel-planner",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "5500"],
+      "runtimeArgs": ["-m", "http.server", "5500", "--directory", "C:/Users/bjsmo/Desktop/travel-planner"],
       "port": 5500
+    },
+    {
+      "name": "web-app",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "web", "run", "dev", "--", "--port", "5173", "--strictPort"],
+      "port": 5173
     }
   ]
 }
