@@ -1,16 +1,18 @@
 import { useEffect, useState } from "react";
-import { firebaseReady, ensureSignedIn } from "./lib/firebase";
+import { firebaseReady, watchAuth, signOutUser } from "./lib/firebase";
 import { subscribeTrips, createTrip, saveTrip, deleteTrip, joinTrip } from "./lib/tripsApi";
 import Home from "./components/Home";
 import TripDetail from "./components/TripDetail";
 import ModalHost from "./components/Modals";
+import AuthGate from "./components/AuthGate";
 
 function getTrip(trips, id) {
   return trips.find((t) => t.id === id) || null;
 }
 
 export default function App() {
-  const [uid, setUid] = useState(null);
+  const [authResolved, setAuthResolved] = useState(false);
+  const [user, setUser] = useState(null);
   const [authError, setAuthError] = useState(null);
   const [trips, setTrips] = useState([]);
   const [tripsReady, setTripsReady] = useState(false);
@@ -20,32 +22,35 @@ export default function App() {
   const [tab, setTab] = useState("itinerary");
   const [dayIdx, setDayIdx] = useState(null);
   const [modal, setModal] = useState(null);
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
-  // Sign in anonymously, then join a trip if ?join=<id> is in the URL.
   useEffect(() => {
-    if (!firebaseReady) { setAuthError("Firebase 설정이 없어요. web/.env.local을 채워주세요."); return; }
-    ensureSignedIn()
-      .then(async (id) => {
-        setUid(id);
-        const params = new URLSearchParams(window.location.search);
-        const joinId = params.get("join");
-        if (joinId) {
-          await joinTrip(joinId, id).catch(() => {});
-          window.history.replaceState(null, "", window.location.pathname);
-        }
-      })
-      .catch((err) => setAuthError(err?.message || "로그인에 실패했어요."));
+    if (!firebaseReady) { setAuthError("Firebase 설정이 없어요. web/.env.local을 채워주세요."); setAuthResolved(true); return; }
+    const unsub = watchAuth((u) => { setUser(u); setAuthResolved(true); });
+    return unsub;
   }, []);
 
+  // Once a real (non-anonymous) user is signed in, consume a pending
+  // ?join=<tripId> link from the URL exactly once.
   useEffect(() => {
-    if (!uid) return;
+    if (!user) return;
+    const params = new URLSearchParams(window.location.search);
+    const joinId = params.get("join");
+    if (!joinId) return;
+    joinTrip(joinId, user.uid)
+      .catch(() => {})
+      .then(() => window.history.replaceState(null, "", window.location.pathname));
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) { setTrips([]); setTripsReady(false); return; }
     const unsub = subscribeTrips(
-      uid,
+      user.uid,
       (list) => { setTrips(list); setTripsReady(true); },
       (err) => setAuthError(err?.message || "데이터를 불러오지 못했어요.")
     );
     return unsub;
-  }, [uid]);
+  }, [user]);
 
   const trip = tripId ? getTrip(trips, tripId) : null;
 
@@ -100,7 +105,7 @@ export default function App() {
     }
 
     if (m.type === "add-trip") {
-      const id = await createTrip(uid, {
+      const id = await createTrip(user.uid, {
         title: values.title, destination: values.destination,
         startDate: values.startDate, endDate: values.endDate,
         travelers: Number(values.travelers) || 1,
@@ -200,14 +205,34 @@ export default function App() {
             <h1>여행 플래너</h1>
             <div className="subline">여러 여행을 관리하고, 다녀온 여행엔 후기와 사진을 남겨보세요.</div>
           </div>
-          {screen === "trip" && (
-            <button className="back-link" style={{ marginBottom: 0 }} onClick={goHome}>← 여행 목록으로</button>
-          )}
+          <div className="btn-row">
+            {screen === "trip" && (
+              <button className="back-link" style={{ marginBottom: 0 }} onClick={goHome}>← 여행 목록으로</button>
+            )}
+            {user && user.isAnonymous && (
+              <span className="btn-row" style={{ alignItems: "center" }}>
+                <span className="section-note">게스트로 이용 중</span>
+                <button className="btn btn-sm btn-primary" onClick={() => setShowUpgrade(true)}>계정 만들기</button>
+              </span>
+            )}
+            {user && !user.isAnonymous && (
+              <span className="btn-row" style={{ alignItems: "center" }}>
+                <span className="section-note">{user.email}</span>
+                <button className="btn btn-sm" onClick={signOutUser}>로그아웃</button>
+              </span>
+            )}
+          </div>
         </div>
       </header>
 
       {authError ? (
         <div className="empty">{authError}</div>
+      ) : !authResolved ? (
+        <div className="empty">불러오는 중이에요…</div>
+      ) : !user ? (
+        <AuthGate onAuthed={setUser} />
+      ) : user.isAnonymous && showUpgrade ? (
+        <AuthGate initialMode="signup" onCancel={() => setShowUpgrade(false)} onAuthed={(u) => { setUser(u); setShowUpgrade(false); }} />
       ) : !tripsReady ? (
         <div className="empty">저장 기능을 불러오는 중이에요…</div>
       ) : screen === "home" ? (
@@ -229,7 +254,7 @@ export default function App() {
         <div className="empty">여행을 찾을 수 없어요.</div>
       )}
 
-      <footer className="app-footer">여행 플래너 · {trips.length}개 여행 관리 중</footer>
+      {user && <footer className="app-footer">여행 플래너 · {trips.length}개 여행 관리 중</footer>}
 
       <ModalHost modal={modal} trip={trip} onClose={closeModal} onSubmit={handleModalSubmit} />
     </div>
