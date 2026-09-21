@@ -1,0 +1,11 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Any signed-in (anonymous is fine) user may read/write review photos.
+    // Trip-level membership isn't checked here for simplicity in this MVP —
+    // photo paths are namespaced by trip id and not discoverable without it.
+    match /trips/{tripId}/review/{fileName} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

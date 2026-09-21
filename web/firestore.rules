@@ -1,0 +1,24 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /trips/{tripId} {
+      allow read: if request.auth != null && request.auth.uid in resource.data.memberIds;
+      allow create: if request.auth != null && request.auth.uid in request.resource.data.memberIds;
+
+      // Existing members can edit trip content freely. A non-member may
+      // only perform the "join via link" update: add exactly their own
+      // uid to memberIds and touch nothing else (see joinTrip in tripsApi.js).
+      allow update: if request.auth != null && (
+        request.auth.uid in resource.data.memberIds ||
+        (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds']) &&
+          request.resource.data.memberIds.hasAll(resource.data.memberIds) &&
+          request.auth.uid in request.resource.data.memberIds &&
+          request.resource.data.memberIds.size() == resource.data.memberIds.size() + 1
+        )
+      );
+
+      allow delete: if request.auth != null && request.auth.uid == resource.data.ownerId;
+    }
+  }
+}
