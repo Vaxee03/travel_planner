@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { getFunctions } from "firebase/functions";
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword,
   createUserWithEmailAndPassword, EmailAuthProvider, linkWithCredential,
@@ -22,22 +23,29 @@ const firebaseConfig = {
 
 export const firebaseReady = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
 
-let app, db, storage, auth;
+let app, db, storage, auth, functions;
 if (firebaseReady) {
   app = initializeApp(firebaseConfig);
   // Named Firestore database (Firebase console lets you create one with a
   // custom id instead of "(default)" — set VITE_FIREBASE_DATABASE_ID if so).
   const databaseId = import.meta.env.VITE_FIREBASE_DATABASE_ID;
-  db = databaseId ? getFirestore(app, databaseId) : getFirestore(app);
+  // Persists reads to IndexedDB so trips already opened once are still
+  // readable offline (PWA offline support relies on this, not just the
+  // service worker caching static assets).
+  const firestoreSettings = { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) };
+  db = databaseId
+    ? initializeFirestore(app, firestoreSettings, databaseId)
+    : initializeFirestore(app, firestoreSettings);
   storage = getStorage(app);
   auth = getAuth(app);
+  functions = getFunctions(app, "us-central1");
 } else {
   console.warn(
     "[firebase] 설정값이 없어 Firebase를 초기화하지 않았어요. web/.env.local에 VITE_FIREBASE_* 값을 채워주세요."
   );
 }
 
-export { db, storage, auth };
+export { db, storage, auth, functions };
 
 /** Subscribes to auth state; fires with the current user (or null) on every change. */
 export function watchAuth(onChange) {

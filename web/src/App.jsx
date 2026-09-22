@@ -26,7 +26,15 @@ export default function App() {
 
   useEffect(() => {
     if (!firebaseReady) { setAuthError("Firebase 설정이 없어요. web/.env.local을 채워주세요."); setAuthResolved(true); return; }
-    const unsub = watchAuth((u) => { setUser(u); setAuthResolved(true); });
+    const unsub = watchAuth((u) => {
+      // A different account (or a sign-out) can't still be looking at the
+      // previous account's trip screen, so drop back to the trip list.
+      setUser((prev) => {
+        if (prev?.uid !== u?.uid) { setScreen("home"); setTripId(null); }
+        return u;
+      });
+      setAuthResolved(true);
+    });
     return unsub;
   }, []);
 
@@ -67,9 +75,20 @@ export default function App() {
     setModal({ type: "confirm", onYes, message, ...extra });
   }
 
+  async function handleJoinByCode(code) {
+    await joinTrip(code, user.uid);
+    openTrip(code);
+  }
+
   function toggleCheck(idx) {
     const t = structuredClone(trip);
     t.checklist[idx].done = !t.checklist[idx].done;
+    saveTrip(t);
+  }
+
+  function reorderDayItems(dayIdx, newItems) {
+    const t = structuredClone(trip);
+    t.days[dayIdx].items = newItems;
     saveTrip(t);
   }
 
@@ -205,10 +224,7 @@ export default function App() {
             <h1>여행 플래너</h1>
             <div className="subline">여러 여행을 관리하고, 다녀온 여행엔 후기와 사진을 남겨보세요.</div>
           </div>
-          <div className="btn-row">
-            {screen === "trip" && (
-              <button className="back-link" style={{ marginBottom: 0 }} onClick={goHome}>← 여행 목록으로</button>
-            )}
+          <div className="btn-row" style={{ alignItems: "center" }}>
             {user && user.isAnonymous && (
               <span className="btn-row" style={{ alignItems: "center" }}>
                 <span className="section-note">게스트로 이용 중</span>
@@ -236,7 +252,7 @@ export default function App() {
       ) : !tripsReady ? (
         <div className="empty">저장 기능을 불러오는 중이에요…</div>
       ) : screen === "home" ? (
-        <Home trips={trips} onOpenTrip={openTrip} onAddTrip={() => openModal({ type: "add-trip" })} />
+        <Home trips={trips} onOpenTrip={openTrip} onAddTrip={() => openModal({ type: "add-trip" })} onJoinByCode={handleJoinByCode} />
       ) : trip ? (
         <TripDetail
           trip={trip}
@@ -247,6 +263,8 @@ export default function App() {
           openModal={openModal}
           requestDelete={requestDelete}
           toggleCheck={toggleCheck}
+          reorderDayItems={reorderDayItems}
+          onBack={goHome}
           onEditTrip={() => openModal({ type: "edit-trip" })}
           onDeleteTrip={() => requestDelete("delete-trip", "이 여행을 삭제할까요? 되돌릴 수 없어요.")}
         />

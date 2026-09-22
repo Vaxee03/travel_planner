@@ -10,6 +10,10 @@ export default function AuthGate({ initialMode = "login", onCancel, onAuthed }) 
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (!e.target.checkValidity()) {
+      setError("모든 필수 항목을 입력해주세요.");
+      return;
+    }
     const fd = new FormData(e.target);
     const email = fd.get("email");
     const password = fd.get("password");
@@ -68,7 +72,7 @@ export default function AuthGate({ initialMode = "login", onCancel, onAuthed }) 
           </button>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           <div className="field">
             <label>이메일</label>
             <input name="email" type="email" placeholder="you@example.com" required autoComplete="email" />

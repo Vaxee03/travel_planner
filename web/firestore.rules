@@ -18,7 +18,10 @@ service cloud.firestore {
         )
       );
 
-      allow delete: if request.auth != null && request.auth.uid == resource.data.ownerId;
+      // Any member may delete, matching the unrestricted edit access members
+      // already have via allow update above (an owner-only check here was a
+      // false boundary: members can already clear/overwrite all trip data).
+      allow delete: if request.auth != null && request.auth.uid in resource.data.memberIds;
     }
   }
 }

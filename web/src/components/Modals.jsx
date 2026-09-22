@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { itemKind } from "../lib/utils";
 import MapPicker from "./MapPicker";
+import InviteCard from "./InviteCard";
+import LocationViewer from "./LocationViewer";
 
-function Field({ name, label, type = "text", placeholder, required, defaultValue }) {
+function Field({ name, label, type = "text", placeholder, required, defaultValue, min }) {
   return (
     <div className="field">
       <label>{label}</label>
-      <input name={name} type={type} placeholder={placeholder} required={required} defaultValue={defaultValue} />
+      <input name={name} type={type} placeholder={placeholder} required={required} defaultValue={defaultValue} min={min} />
     </div>
   );
 }
@@ -25,13 +27,34 @@ function formValues(form) {
   return Object.fromEntries(fd.entries());
 }
 
+/** A form's own required/min/type constraints are checked silently via
+ * checkValidity() and reported through this box instead of the browser's
+ * native validation bubble, so every "필수 항목" error looks the same. */
+function FormNote({ message }) {
+  if (!message) return null;
+  return (
+    <div className="note" style={{ marginTop: -4, marginBottom: 12 }}>
+      <span className="dot" />
+      <span>{message}</span>
+    </div>
+  );
+}
+
 /** Renders the overlay + the right form for `modal.type`. Submits call
  * onSubmit(modal.type, values) so App.jsx can own all the write logic. */
 export default function ModalHost({ modal, trip, onClose, onSubmit }) {
+  const [formError, setFormError] = useState(null);
+  useEffect(() => { setFormError(null); }, [modal]);
+
   if (!modal) return null;
 
   function handleSubmit(e) {
     e.preventDefault();
+    if (!e.target.checkValidity()) {
+      setFormError("모든 필수 항목을 입력해주세요.");
+      return;
+    }
+    setFormError(null);
     onSubmit(modal, formValues(e.target));
   }
 
@@ -58,27 +81,12 @@ export default function ModalHost({ modal, trip, onClose, onSubmit }) {
   } else if (modal.type === "add-trip" || modal.type === "edit-trip") {
     const isEdit = modal.type === "edit-trip";
     const t = isEdit ? trip : {};
-    content = (
-      <form onSubmit={handleSubmit}>
-        <h3>{isEdit ? "여행 정보 수정" : "새 여행 만들기"}</h3>
-        <Field name="title" label="여행 이름" placeholder="예: 오사카 벚꽃 여행" required defaultValue={t.title} />
-        <Field name="destination" label="목적지" placeholder="예: 오사카" defaultValue={t.destination} />
-        <div className="field-row">
-          <Field name="startDate" label="시작일" type="date" required defaultValue={t.startDate} />
-          <Field name="endDate" label="종료일" type="date" required defaultValue={t.endDate} />
-        </div>
-        <div className="field-row">
-          <Field name="travelers" label="인원 수" type="number" placeholder="예: 2" defaultValue={t.travelers || 1} />
-          <Field name="budgetTotal" label="총 예산 (원)" type="number" placeholder="예: 1000000" defaultValue={t.budgetTotal} />
-        </div>
-        <Actions submitLabel={isEdit ? "저장" : "여행 만들기"} onClose={onClose} />
-      </form>
-    );
+    content = <TripForm isEdit={isEdit} t={t} onSubmit={handleSubmit} onClose={onClose} />;
   } else if (modal.type === "add-day" || modal.type === "edit-day") {
     const isEdit = modal.type === "edit-day";
     const d = isEdit ? trip.days[modal.idx] : { date: "", status: "open", summary: "" };
     content = (
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} noValidate>
         <h3>{isEdit ? "날짜 수정" : "날짜 추가"}</h3>
         <Field name="date" label="날짜" type="date" required defaultValue={d.date} />
         <div className="field">
@@ -89,6 +97,7 @@ export default function ModalHost({ modal, trip, onClose, onSubmit }) {
           </select>
         </div>
         <Field name="summary" label="한 줄 요약" placeholder="예: 아키하바라 관광 & 쇼핑" defaultValue={d.summary} />
+        <FormNote message={formError} />
         <Actions submitLabel={isEdit ? "저장" : "추가"} onClose={onClose} />
       </form>
     );
@@ -98,19 +107,21 @@ export default function ModalHost({ modal, trip, onClose, onSubmit }) {
     content = <ItemForm isEdit={isEdit} it={it} onSubmit={handleSubmit} onClose={onClose} />;
   } else if (modal.type === "add-budget") {
     content = (
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} noValidate>
         <h3>지출 항목 추가</h3>
         <Field name="category" label="카테고리" placeholder="예: 숙박 / 교통 / 식비 / 쇼핑" required />
         <Field name="amount" label="금액 (원)" type="number" placeholder="예: 150000" required />
         <Field name="memo" label="메모" placeholder="선택" />
+        <FormNote message={formError} />
         <Actions submitLabel="추가" onClose={onClose} />
       </form>
     );
   } else if (modal.type === "add-check") {
     content = (
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} noValidate>
         <h3>준비물 추가</h3>
         <Field name="text" label="항목" placeholder="예: 온천용 수건" required />
+        <FormNote message={formError} />
         <Actions submitLabel="추가" onClose={onClose} />
       </form>
     );
@@ -118,7 +129,7 @@ export default function ModalHost({ modal, trip, onClose, onSubmit }) {
     const isEdit = modal.type === "edit-booking";
     const b = isEdit ? trip.bookings[modal.idx] : { type: "항공권", name: "", confirmNumber: "", link: "", memo: "" };
     content = (
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} noValidate>
         <h3>{isEdit ? "예약 정보 수정" : "예약 정보 추가"}</h3>
         <div className="field">
           <label>종류</label>
@@ -132,9 +143,14 @@ export default function ModalHost({ modal, trip, onClose, onSubmit }) {
         <Field name="confirmNumber" label="예약번호" placeholder="예: ABC123" defaultValue={b.confirmNumber} />
         <Field name="link" label="링크" placeholder="예: 체크인/예약 확인 URL" defaultValue={b.link} />
         <Field name="memo" label="메모" placeholder="선택" defaultValue={b.memo} />
+        <FormNote message={formError} />
         <Actions submitLabel={isEdit ? "저장" : "추가"} onClose={onClose} />
       </form>
     );
+  } else if (modal.type === "invite") {
+    content = <InviteCard trip={trip} onClose={onClose} />;
+  } else if (modal.type === "view-location") {
+    content = <LocationViewer location={modal.location} label={modal.label} onClose={onClose} />;
   } else if (modal.type === "edit-review") {
     content = (
       <form onSubmit={handleSubmit}>
@@ -148,7 +164,7 @@ export default function ModalHost({ modal, trip, onClose, onSubmit }) {
     );
   }
 
-  const isWide = modal.type === "add-item" || modal.type === "edit-item";
+  const isWide = modal.type === "add-item" || modal.type === "edit-item" || modal.type === "invite" || modal.type === "view-location";
   return (
     <div className="modal-overlay">
       <div className={"modal" + (isWide ? " modal-wide" : "")} onClick={(e) => e.stopPropagation()}>
@@ -158,30 +174,94 @@ export default function ModalHost({ modal, trip, onClose, onSubmit }) {
   );
 }
 
+function TripForm({ isEdit, t, onSubmit, onClose }) {
+  const [startDate, setStartDate] = useState(t.startDate || "");
+  const [endDate, setEndDate] = useState(t.endDate || "");
+  const [error, setError] = useState(null);
+
+  function handleSubmit(e) {
+    if (startDate && endDate && endDate < startDate) {
+      e.preventDefault();
+      setError("종료일은 시작일보다 빠를 수 없어요.");
+      return;
+    }
+    const travelers = Number(new FormData(e.target).get("travelers"));
+    if (!travelers || travelers < 1) {
+      e.preventDefault();
+      setError("인원 수는 1명 이상이어야 해요.");
+      return;
+    }
+    if (!e.target.checkValidity()) {
+      e.preventDefault();
+      setError("모든 필수 항목을 입력해주세요.");
+      return;
+    }
+    setError(null);
+    onSubmit(e);
+  }
+
+  return (
+    <form onSubmit={handleSubmit} noValidate>
+      <h3>{isEdit ? "여행 정보 수정" : "새 여행 만들기"}</h3>
+      <Field name="title" label="여행 이름" placeholder="예: 오사카 벚꽃 여행" required defaultValue={t.title} />
+      <Field name="destination" label="목적지" placeholder="예: 오사카" defaultValue={t.destination} />
+      <div className="field-row">
+        <div className="field">
+          <label>시작일</label>
+          <input name="startDate" type="date" required value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>종료일</label>
+          <input name="endDate" type="date" required value={endDate} min={startDate || undefined} onChange={(e) => setEndDate(e.target.value)} />
+        </div>
+      </div>
+      <div className="field-row">
+        <Field name="travelers" label="인원 수" type="number" placeholder="예: 2" min={1} required defaultValue={t.travelers || 1} />
+        <Field name="budgetTotal" label="총 예산 (원)" type="number" placeholder="예: 1000000" defaultValue={t.budgetTotal} />
+      </div>
+      <FormNote message={error} />
+      <Actions submitLabel={isEdit ? "저장" : "여행 만들기"} onClose={onClose} />
+    </form>
+  );
+}
+
 function ItemForm({ isEdit, it, onSubmit, onClose }) {
   const initialKind = isEdit ? itemKind(it) : "time";
   const [kind, setKind] = useState(initialKind);
+  const [error, setError] = useState(null);
+
+  function handleSubmit(e) {
+    if (!e.target.checkValidity()) {
+      e.preventDefault();
+      setError("모든 필수 항목을 입력해주세요.");
+      return;
+    }
+    setError(null);
+    onSubmit(e);
+  }
+
   return (
-    <form onSubmit={onSubmit}>
+    <form onSubmit={handleSubmit} noValidate>
       <h3>{isEdit ? "항목 수정" : "항목 추가"}</h3>
       <div className="field">
-        <label>기준</label>
+        <label>유형</label>
         <div className="btn-row" style={{ gap: 16 }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 400, color: "var(--ink)" }}>
-            <input type="radio" name="kind" value="time" checked={kind === "time"} onChange={() => setKind("time")} /> 시간
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 400, color: "var(--ink)", whiteSpace: "nowrap" }}>
+            <input type="radio" name="kind" value="time" checked={kind === "time"} onChange={() => setKind("time")} style={{ width: "auto", flexShrink: 0 }} /> 시간
           </label>
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 400, color: "var(--ink)" }}>
-            <input type="radio" name="kind" value="label" checked={kind === "label"} onChange={() => setKind("label")} /> 글자
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 400, color: "var(--ink)", whiteSpace: "nowrap" }}>
+            <input type="radio" name="kind" value="label" checked={kind === "label"} onChange={() => setKind("label")} style={{ width: "auto", flexShrink: 0 }} /> 텍스트
           </label>
         </div>
       </div>
       {kind === "time" ? (
         <Field name="timeValue" label="시간" type="time" defaultValue={initialKind === "time" ? it.time : ""} />
       ) : (
-        <Field name="labelValue" label="구분 글자" placeholder="예: 이동, 식사, 귀국" defaultValue={initialKind === "label" ? it.time : ""} />
+        <Field name="labelValue" label="구분 텍스트" placeholder="예: 이동, 식사, 귀국" defaultValue={initialKind === "label" ? it.time : ""} />
       )}
       <Field name="text" label="내용" placeholder="예: 오와쿠다니 로프웨이" required defaultValue={it.text} />
       <ItemLocationField initial={it.location} />
+      <FormNote message={error} />
       <Actions submitLabel={isEdit ? "저장" : "추가"} onClose={onClose} />
     </form>
   );
