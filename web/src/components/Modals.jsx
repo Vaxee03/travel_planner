@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { itemKind } from "../lib/utils";
+import { DOMESTIC_DESTINATIONS, INTERNATIONAL_DESTINATIONS } from "../lib/destinations";
 import MapPicker from "./MapPicker";
 import InviteCard from "./InviteCard";
 import LocationViewer from "./LocationViewer";
@@ -217,7 +218,7 @@ function TripForm({ isEdit, t, onSubmit, onClose }) {
         </div>
       </div>
       <Field name="title" label="여행 이름" placeholder={tripType === "domestic" ? "예: 부산 여행" : "예: 오사카 벚꽃 여행"} required defaultValue={t.title} />
-      <Field name="destination" label="목적지" placeholder={tripType === "domestic" ? "예: 부산" : "예: 오사카"} defaultValue={t.destination} />
+      <DestinationField tripType={tripType} defaultValue={t.destination} />
       <div className="field-row">
         <div className="field">
           <label>시작일</label>
@@ -235,6 +236,67 @@ function TripForm({ isEdit, t, onSubmit, onClose }) {
       <FormNote message={error} />
       <Actions submitLabel={isEdit ? "저장" : "여행 만들기"} onClose={onClose} />
     </form>
+  );
+}
+
+/** Destination as search-and-pick instead of free text: domestic offers Korean
+ * cities/vacation spots, international offers nearby countries' major travel
+ * cities. Still a plain text input underneath (name="destination") so an
+ * unlisted place can just be typed — the dropdown is a shortcut, not a lock. */
+function DestinationField({ tripType, defaultValue }) {
+  const [query, setQuery] = useState(defaultValue || "");
+  const [open, setOpen] = useState(false);
+
+  const options = useMemo(() => {
+    if (tripType === "domestic") {
+      return DOMESTIC_DESTINATIONS.map((city) => ({ city, sub: null }));
+    }
+    return INTERNATIONAL_DESTINATIONS.flatMap((g) => g.cities.map((city) => ({ city, sub: g.country })));
+  }, [tripType]);
+
+  const q = query.trim();
+  const filtered = (q ? options.filter((o) => o.city.includes(q) || (o.sub && o.sub.includes(q))) : options).slice(0, 8);
+
+  return (
+    <div className="field" style={{ position: "relative" }}>
+      <label>목적지</label>
+      <input
+        name="destination"
+        placeholder={tripType === "domestic" ? "예: 부산 (검색해서 선택하거나 직접 입력)" : "예: 오사카 (검색해서 선택하거나 직접 입력)"}
+        value={query}
+        onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        autoComplete="off"
+      />
+      {open && filtered.length > 0 && (
+        <div
+          style={{
+            position: "absolute", top: "100%", left: 0, right: 0, zIndex: 30,
+            marginTop: 4, background: "var(--surface)",
+            border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden",
+            boxShadow: "0 8px 24px rgba(0,0,0,.25)",
+          }}
+        >
+          {filtered.map((o, i) => (
+            <button
+              key={o.sub ? `${o.sub}-${o.city}` : o.city}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => { setQuery(o.city); setOpen(false); }}
+              style={{
+                display: "block", width: "100%", textAlign: "left", background: "none",
+                border: "none", borderBottom: i < filtered.length - 1 ? "1px solid var(--line)" : "none",
+                padding: "10px 12px", cursor: "pointer", color: "var(--ink)", font: "inherit",
+              }}
+            >
+              <div>{o.city}</div>
+              {o.sub && <div style={{ fontSize: 12.5, color: "var(--ink-soft)" }}>{o.sub}</div>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
