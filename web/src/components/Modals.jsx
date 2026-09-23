@@ -3,6 +3,7 @@ import { useJsApiLoader } from "@react-google-maps/api";
 import { itemKind } from "../lib/utils";
 import { MAPS_LOADER_OPTIONS } from "../lib/mapsLoader";
 import { fetchCitySuggestions, INTERNATIONAL_REGION_CODES } from "../lib/placeSearch";
+import { EXTRA_INTERNATIONAL_DESTINATIONS } from "../lib/extraDestinations";
 import MapPicker from "./MapPicker";
 import InviteCard from "./InviteCard";
 import LocationViewer from "./LocationViewer";
@@ -265,12 +266,24 @@ function DestinationField({ tripType, defaultValue }) {
     if (!q) { setSuggestions([]); return; }
 
     debounceRef.current = setTimeout(async () => {
+      let apiResults = [];
       try {
         const regionCodes = tripType === "domestic" ? ["kr"] : INTERNATIONAL_REGION_CODES;
-        setSuggestions(await fetchCitySuggestions(q, { regionCodes }));
+        apiResults = await fetchCitySuggestions(q, { regionCodes });
       } catch {
-        setSuggestions([]);
+        apiResults = [];
       }
+      if (tripType === "domestic") {
+        setSuggestions(apiResults);
+        return;
+      }
+      const seen = new Set(apiResults.map((r) => `${r.city}|${r.sub}`));
+      const extraResults = EXTRA_INTERNATIONAL_DESTINATIONS.flatMap((g) =>
+        g.cities
+          .filter((city) => city.includes(q) && !seen.has(`${city}|${g.country}`))
+          .map((city) => ({ city, sub: g.country }))
+      );
+      setSuggestions([...apiResults, ...extraResults]);
     }, 200);
     return () => clearTimeout(debounceRef.current);
   }, [query, isLoaded, tripType]);
