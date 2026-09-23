@@ -1,7 +1,10 @@
 import { fmtMoney } from "../lib/utils";
+import { useNicknames } from "../lib/useNicknames";
 
 export default function Budget({ trip, openModal, requestDelete }) {
   const items = trip.budgetItems || [];
+  const showAuthor = (trip.memberIds || []).length > 1;
+  const nicknames = useNicknames(items.map((it) => it.createdBy));
   const spent = items.reduce((s, it) => s + (Number(it.amount) || 0), 0);
   const total = Number(trip.budgetTotal) || 0;
   const pct = total > 0 ? Math.min(100, Math.round((spent / total) * 100)) : 0;
@@ -62,7 +65,12 @@ export default function Budget({ trip, openModal, requestDelete }) {
           <div className="card">
             {items.map((it, idx) => (
               <div className="item-row" key={idx}>
-                <span>{it.category || "기타"}{it.memo ? " · " + it.memo : ""}</span>
+                <span>
+                  {it.category || "기타"}{it.memo ? " · " + it.memo : ""}
+                  {showAuthor && it.createdBy && (
+                    <span className="section-note" style={{ marginLeft: 8 }}>{nicknames[it.createdBy] || "이름 없는 동행자"}</span>
+                  )}
+                </span>
                 <span className="btn-row" style={{ alignItems: "center" }}>
                   <span className="nums" style={{ color: "var(--ink)", fontFamily: "'JetBrains Mono',monospace" }}>{fmtMoney(it.amount)}원</span>
                   <button className="btn-ghost btn-sm btn-danger" onClick={() => requestDelete("delete-budget", "이 지출 항목을 삭제할까요?", { idx })}>삭제</button>

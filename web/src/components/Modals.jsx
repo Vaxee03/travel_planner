@@ -156,13 +156,25 @@ export default function ModalHost({ modal, trip, onClose, onSubmit }) {
     content = <InviteCard trip={trip} onClose={onClose} />;
   } else if (modal.type === "view-location") {
     content = <LocationViewer location={modal.location} label={modal.label} onClose={onClose} />;
+  } else if (modal.type === "set-nickname" || modal.type === "edit-nickname") {
+    const isEdit = modal.type === "edit-nickname";
+    content = (
+      <form onSubmit={handleSubmit} noValidate>
+        <h3>{isEdit ? "닉네임 수정" : "닉네임을 설정해주세요"}</h3>
+        {!isEdit && <p style={{ margin: "0 0 14px", color: "var(--ink-soft)", fontSize: 13.5 }}>동행자들에게 보여질 이름이에요. 나중에 언제든 바꿀 수 있어요.</p>}
+        <Field name="nickname" label="닉네임" placeholder="예: 여행러버" defaultValue={modal.currentNickname || ""} />
+        <FormNote message={formError} />
+        <Actions submitLabel="저장" onClose={onClose} />
+      </form>
+    );
   } else if (modal.type === "edit-review") {
+    const myPost = (trip.reviews || []).find((r) => r.authorId === modal.uid);
     content = (
       <form onSubmit={handleSubmit}>
-        <h3>여행 후기</h3>
+        <h3>내 여행 후기</h3>
         <div className="field">
           <label>후기</label>
-          <textarea name="text" rows={7} placeholder="여행은 어땠나요?" defaultValue={trip.review?.text || ""} />
+          <textarea name="text" rows={7} placeholder="여행은 어땠나요?" defaultValue={myPost?.text || ""} />
         </div>
         <Actions submitLabel="저장" onClose={onClose} />
       </form>

@@ -1,5 +1,7 @@
 import { ddayLabel, fmtMoney, tripStatus } from "../lib/utils";
 import { downloadTripIcs } from "../lib/ics";
+import { useNicknames } from "../lib/useNicknames";
+import { DEFAULT_NICKNAME } from "../lib/users";
 import Itinerary from "./Itinerary";
 import Budget from "./Budget";
 import Checklist from "./Checklist";
@@ -15,10 +17,12 @@ const TABS = [
   { key: "restaurants", label: "맛집 추천" },
 ];
 
-export default function TripDetail({ trip, tab, setTab, dayIdx, setDayIdx, openModal, requestDelete, toggleCheck, reorderDayItems, onBack, onEditTrip, onDeleteTrip }) {
+export default function TripDetail({ trip, uid, tab, setTab, dayIdx, setDayIdx, openModal, requestDelete, toggleCheck, reorderDayItems, onBack, onEditTrip, onDeleteTrip }) {
   const st = tripStatus(trip);
   const dday = ddayLabel(trip);
   const canReview = st === "completed";
+  const memberIds = trip.memberIds || [];
+  const nicknames = useNicknames(memberIds);
 
   return (
     <>
@@ -42,6 +46,17 @@ export default function TripDetail({ trip, tab, setTab, dayIdx, setDayIdx, openM
           </div>
           <button className="back-link" style={{ margin: 0 }} onClick={onBack}>← 여행 목록으로</button>
         </div>
+        {memberIds.length > 0 && (
+          <div className="section-note" style={{ marginTop: 10 }}>
+            동행자: {memberIds.map((uid, i) => (
+              <span key={uid}>
+                {i > 0 ? ", " : ""}
+                {nicknames[uid] || DEFAULT_NICKNAME}
+                {uid === trip.ownerId ? " 👑" : ""}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="tabbar">
@@ -71,7 +86,7 @@ export default function TripDetail({ trip, tab, setTab, dayIdx, setDayIdx, openM
       {tab === "checklist" && <Checklist trip={trip} openModal={openModal} requestDelete={requestDelete} toggleCheck={toggleCheck} />}
       {tab === "bookings" && <Bookings trip={trip} openModal={openModal} requestDelete={requestDelete} />}
       {tab === "restaurants" && <Restaurants trip={trip} />}
-      {tab === "review" && <Review trip={trip} canReview={canReview} openModal={openModal} />}
+      {tab === "review" && <Review trip={trip} uid={uid} canReview={canReview} openModal={openModal} requestDelete={requestDelete} />}
     </>
   );
 }

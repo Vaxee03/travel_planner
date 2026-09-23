@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { firebaseReady, watchAuth, signOutUser } from "./lib/firebase";
 import { subscribeTrips, createTrip, saveTrip, deleteTrip, joinTrip } from "./lib/tripsApi";
+import { fetchNickname, setNickname } from "./lib/users";
 import Home from "./components/Home";
 import TripDetail from "./components/TripDetail";
 import ModalHost from "./components/Modals";
@@ -23,6 +24,8 @@ export default function App() {
   const [dayIdx, setDayIdx] = useState(null);
   const [modal, setModal] = useState(null);
   const [showUpgrade, setShowUpgrade] = useState(false);
+  const [nickname, setNicknameState] = useState("");
+  const nicknamePromptedRef = useRef(null);
 
   useEffect(() => {
     if (!firebaseReady) { setAuthError("Firebase 설정이 없어요. web/.env.local을 채워주세요."); setAuthResolved(true); return; }
@@ -48,6 +51,24 @@ export default function App() {
     joinTrip(joinId, user.uid)
       .catch(() => {})
       .then(() => window.history.replaceState(null, "", window.location.pathname));
+  }, [user]);
+
+  // Non-guest accounts need a nickname for other members to see them by; if
+  // one hasn't been set yet (brand-new signup or a pre-existing account from
+  // before this feature), prompt once per login — skippable, since the rest
+  // of the app falls back to a default label when it's blank.
+  useEffect(() => {
+    if (!user || user.isAnonymous) { setNicknameState(""); return; }
+    let cancelled = false;
+    fetchNickname(user.uid).then((nick) => {
+      if (cancelled) return;
+      setNicknameState(nick);
+      if (!nick && nicknamePromptedRef.current !== user.uid) {
+        nicknamePromptedRef.current = user.uid;
+        setModal({ type: "set-nickname" });
+      }
+    });
+    return () => { cancelled = true; };
   }, [user]);
 
   useEffect(() => {
@@ -118,11 +139,24 @@ export default function App() {
         const t = structuredClone(trip);
         t.bookings.splice(m.idx, 1);
         await saveTrip(t);
+      } else if (m.onYes === "delete-review") {
+        const t = structuredClone(trip);
+        t.reviews = (t.reviews || []).filter((r) => r.authorId !== m.authorId);
+        await saveTrip(t);
       }
       closeModal();
       return;
     }
 
+    if (m.type === "set-nickname" || m.type === "edit-nickname") {
+      const nick = (values.nickname || "").trim();
+      if (nick) {
+        await setNickname(user.uid, nick);
+        setNicknameState(nick);
+      }
+      closeModal();
+      return;
+    }
     if (m.type === "add-trip") {
       const id = await createTrip(user.uid, {
         title: values.title, destination: values.destination,
@@ -184,7 +218,7 @@ export default function App() {
     if (m.type === "add-budget") {
       const t = structuredClone(trip);
       t.budgetItems = t.budgetItems || [];
-      t.budgetItems.push({ category: values.category, amount: Number(values.amount) || 0, memo: values.memo });
+      t.budgetItems.push({ category: values.category, amount: Number(values.amount) || 0, memo: values.memo, createdBy: user.uid });
       await saveTrip(t);
       closeModal();
       return;
@@ -192,7 +226,7 @@ export default function App() {
     if (m.type === "add-check") {
       const t = structuredClone(trip);
       t.checklist = t.checklist || [];
-      t.checklist.push({ text: values.text, done: false });
+      t.checklist.push({ text: values.text, done: false, createdBy: user.uid });
       await saveTrip(t);
       closeModal();
       return;
@@ -209,8 +243,10 @@ export default function App() {
     }
     if (m.type === "edit-review") {
       const t = structuredClone(trip);
-      t.review = t.review || { photos: [] };
-      t.review.text = values.text;
+      t.reviews = t.reviews || [];
+      const idx = t.reviews.findIndex((r) => r.authorId === user.uid);
+      if (idx >= 0) t.reviews[idx] = { ...t.reviews[idx], text: values.text, updatedAt: Date.now() };
+      else t.reviews.push({ authorId: user.uid, text: values.text, photos: [], updatedAt: Date.now() });
       await saveTrip(t);
       closeModal();
       return;
@@ -235,7 +271,8 @@ export default function App() {
             )}
             {user && !user.isAnonymous && (
               <span className="btn-row" style={{ alignItems: "center" }}>
-                <span className="section-note">{user.email}</span>
+                <span className="section-note">{nickname || "닉네임 없음"} · {user.email}</span>
+                <button className="btn btn-sm" onClick={() => setModal({ type: "edit-nickname", currentNickname: nickname })}>닉네임 수정</button>
                 <button className="btn btn-sm" onClick={signOutUser}>로그아웃</button>
               </span>
             )}
@@ -258,6 +295,7 @@ export default function App() {
       ) : trip ? (
         <TripDetail
           trip={trip}
+          uid={user.uid}
           tab={tab}
           setTab={setTab}
           dayIdx={dayIdx}
