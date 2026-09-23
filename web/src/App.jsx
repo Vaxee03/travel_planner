@@ -129,6 +129,7 @@ export default function App() {
         startDate: values.startDate, endDate: values.endDate,
         travelers: Number(values.travelers) || 1,
         budgetTotal: Number(values.budgetTotal) || 0,
+        tripType: values.tripType === "domestic" ? "domestic" : "international",
       });
       openTrip(id);
       closeModal();
@@ -140,6 +141,7 @@ export default function App() {
       t.startDate = values.startDate; t.endDate = values.endDate;
       t.travelers = Number(values.travelers) || 1;
       t.budgetTotal = Number(values.budgetTotal) || 0;
+      t.tripType = values.tripType === "domestic" ? "domestic" : "international";
       await saveTrip(t);
       closeModal();
       return;

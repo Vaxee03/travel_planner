@@ -35,6 +35,7 @@ export default function TripDetail({ trip, tab, setTab, dayIdx, setDayIdx, openM
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
           <div className="chips">
             {dday && <span className="chip"><b>{dday}</b></span>}
+            <span className="chip">{trip.tripType === "domestic" ? "🇰🇷 국내" : "✈️ 해외"}</span>
             <span className="chip">📍 {trip.destination || "-"}</span>
             <span className="chip nums">📅 {trip.startDate} – {trip.endDate}</span>
             {trip.budgetTotal ? <span className="chip">💴 예산 <b>{fmtMoney(trip.budgetTotal)}원</b></span> : null}

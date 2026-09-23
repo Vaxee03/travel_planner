@@ -12,7 +12,7 @@ export default function Restaurants({ trip }) {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchRestaurantRecommendations(trip.destination, preferences);
+      const data = await fetchRestaurantRecommendations(trip.destination, preferences, trip.tripType);
       await saveTrip({ ...trip, restaurantRecs: data });
     } catch (err) {
       setError(err?.message || "맛집 추천을 가져오지 못했어요.");

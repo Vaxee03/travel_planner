@@ -127,19 +127,20 @@ export default function ModalHost({ modal, trip, onClose, onSubmit }) {
     );
   } else if (modal.type === "add-booking" || modal.type === "edit-booking") {
     const isEdit = modal.type === "edit-booking";
-    const b = isEdit ? trip.bookings[modal.idx] : { type: "항공권", name: "", confirmNumber: "", link: "", memo: "" };
+    const isDomestic = trip.tripType === "domestic";
+    const b = isEdit ? trip.bookings[modal.idx] : { type: isDomestic ? "교통" : "항공권", name: "", confirmNumber: "", link: "", memo: "" };
     content = (
       <form onSubmit={handleSubmit} noValidate>
         <h3>{isEdit ? "예약 정보 수정" : "예약 정보 추가"}</h3>
         <div className="field">
           <label>종류</label>
           <select name="type" defaultValue={b.type}>
-            <option value="항공권">항공권</option>
+            {isDomestic ? <option value="교통">교통</option> : <option value="항공권">항공권</option>}
             <option value="숙소">숙소</option>
             <option value="기타">기타</option>
           </select>
         </div>
-        <Field name="name" label="이름" placeholder="예: 인천→나리타 KE001 / 스이메이소 호텔" required defaultValue={b.name} />
+        <Field name="name" label="이름" placeholder={isDomestic ? "예: KTX 부산행 / OO 호텔" : "예: 인천→나리타 KE001 / 스이메이소 호텔"} required defaultValue={b.name} />
         <Field name="confirmNumber" label="예약번호" placeholder="예: ABC123" defaultValue={b.confirmNumber} />
         <Field name="link" label="링크" placeholder="예: 체크인/예약 확인 URL" defaultValue={b.link} />
         <Field name="memo" label="메모" placeholder="선택" defaultValue={b.memo} />
@@ -177,6 +178,7 @@ export default function ModalHost({ modal, trip, onClose, onSubmit }) {
 function TripForm({ isEdit, t, onSubmit, onClose }) {
   const [startDate, setStartDate] = useState(t.startDate || "");
   const [endDate, setEndDate] = useState(t.endDate || "");
+  const [tripType, setTripType] = useState(t.tripType || "international");
   const [error, setError] = useState(null);
 
   function handleSubmit(e) {
@@ -203,8 +205,19 @@ function TripForm({ isEdit, t, onSubmit, onClose }) {
   return (
     <form onSubmit={handleSubmit} noValidate>
       <h3>{isEdit ? "여행 정보 수정" : "새 여행 만들기"}</h3>
-      <Field name="title" label="여행 이름" placeholder="예: 오사카 벚꽃 여행" required defaultValue={t.title} />
-      <Field name="destination" label="목적지" placeholder="예: 오사카" defaultValue={t.destination} />
+      <div className="field">
+        <label>여행 유형</label>
+        <div className="btn-row" style={{ gap: 16 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 400, color: "var(--ink)", whiteSpace: "nowrap" }}>
+            <input type="radio" name="tripType" value="domestic" checked={tripType === "domestic"} onChange={() => setTripType("domestic")} style={{ width: "auto", flexShrink: 0 }} /> 국내
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 400, color: "var(--ink)", whiteSpace: "nowrap" }}>
+            <input type="radio" name="tripType" value="international" checked={tripType === "international"} onChange={() => setTripType("international")} style={{ width: "auto", flexShrink: 0 }} /> 해외
+          </label>
+        </div>
+      </div>
+      <Field name="title" label="여행 이름" placeholder={tripType === "domestic" ? "예: 부산 여행" : "예: 오사카 벚꽃 여행"} required defaultValue={t.title} />
+      <Field name="destination" label="목적지" placeholder={tripType === "domestic" ? "예: 부산" : "예: 오사카"} defaultValue={t.destination} />
       <div className="field-row">
         <div className="field">
           <label>시작일</label>

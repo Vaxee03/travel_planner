@@ -1,7 +1,16 @@
-export const DEFAULT_CHECKLIST = [
-  "여권 & 항공권 e-티켓", "엔화 환전 / 트래블카드", "eSIM 또는 포켓와이파이",
+const DEFAULT_CHECKLIST_INTERNATIONAL = [
+  "여권 & 항공권 e-티켓", "환전 / 트래블카드", "eSIM 또는 포켓와이파이",
   "숙소 예약 확인서", "보조배터리 & 충전기", "상비약", "여행자 보험", "캐리어 무게 확인",
-].map((text) => ({ text, done: false }));
+];
+
+const DEFAULT_CHECKLIST_DOMESTIC = [
+  "숙소 예약 확인서", "기차/버스표 예매 확인", "보조배터리 & 충전기", "상비약", "여벌 옷 & 세면도구", "카드/현금",
+];
+
+export function defaultChecklist(tripType) {
+  const items = tripType === "domestic" ? DEFAULT_CHECKLIST_DOMESTIC : DEFAULT_CHECKLIST_INTERNATIONAL;
+  return items.map((text) => ({ text, done: false }));
+}
 
 export function todayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -84,8 +93,9 @@ export function saveBlobAsFile(filename, dataOrBlob) {
 export function emptyTrip(overrides) {
   return {
     title: "", destination: "", startDate: "", endDate: "", travelers: 1, budgetTotal: 0,
+    tripType: "international",
     days: [], budgetItems: [], bookings: [],
-    checklist: JSON.parse(JSON.stringify(DEFAULT_CHECKLIST)),
+    checklist: defaultChecklist(overrides?.tripType),
     review: { text: "", photos: [] },
     ...overrides,
   };

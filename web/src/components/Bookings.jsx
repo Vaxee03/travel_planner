@@ -7,7 +7,9 @@ export default function Bookings({ trip, openModal, requestDelete }) {
         <button className="btn btn-primary btn-sm" onClick={() => openModal({ type: "add-booking" })}>+ 예약 추가</button>
       </div>
       {items.length === 0 ? (
-        <div className="empty">등록된 예약 정보가 없어요. 항공권/숙소 예약번호를 저장해보세요.</div>
+        <div className="empty">
+          등록된 예약 정보가 없어요. {trip.tripType === "domestic" ? "교통/숙소" : "항공권/숙소"} 예약번호를 저장해보세요.
+        </div>
       ) : (
         <div className="food-results">
           {items.map((b, idx) => (
