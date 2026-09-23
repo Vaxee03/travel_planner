@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useJsApiLoader } from "@react-google-maps/api";
 import { itemKind } from "../lib/utils";
-import { DOMESTIC_DESTINATIONS, INTERNATIONAL_DESTINATIONS } from "../lib/destinations";
+import { MAPS_LOADER_OPTIONS } from "../lib/mapsLoader";
+import { fetchCitySuggestions, INTERNATIONAL_REGION_CODES } from "../lib/placeSearch";
 import MapPicker from "./MapPicker";
 import InviteCard from "./InviteCard";
 import LocationViewer from "./LocationViewer";
@@ -239,23 +241,46 @@ function TripForm({ isEdit, t, onSubmit, onClose }) {
   );
 }
 
-/** Destination as search-and-pick instead of free text: domestic offers Korean
- * cities/vacation spots, international offers nearby countries' major travel
- * cities. Still a plain text input underneath (name="destination") so an
- * unlisted place can just be typed — the dropdown is a shortcut, not a lock. */
+/** Destination as search-and-pick instead of free text, backed by the New
+ * Places API (same one MapPicker uses) instead of a hardcoded city list —
+ * covers any city Google knows about, not just a curated shortlist. Domestic
+ * restricts to South Korea; international asks worldwide and drops any hit
+ * that comes back located in Korea. Still a plain text input underneath
+ * (name="destination") so an unlisted place can just be typed — the dropdown
+ * is a shortcut, not a lock. */
 function DestinationField({ tripType, defaultValue }) {
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  const { isLoaded } = useJsApiLoader({ googleMapsApiKey: apiKey || "", ...MAPS_LOADER_OPTIONS });
   const [query, setQuery] = useState(defaultValue || "");
+  const [suggestions, setSuggestions] = useState([]);
   const [open, setOpen] = useState(false);
+  const debounceRef = useRef(null);
+  const skipNextFetchRef = useRef(false);
 
-  const options = useMemo(() => {
-    if (tripType === "domestic") {
-      return DOMESTIC_DESTINATIONS.map((city) => ({ city, sub: null }));
-    }
-    return INTERNATIONAL_DESTINATIONS.flatMap((g) => g.cities.map((city) => ({ city, sub: g.country })));
-  }, [tripType]);
+  useEffect(() => {
+    if (skipNextFetchRef.current) { skipNextFetchRef.current = false; return; }
+    if (!isLoaded) return;
+    clearTimeout(debounceRef.current);
+    const q = query.trim();
+    if (!q) { setSuggestions([]); return; }
 
-  const q = query.trim();
-  const filtered = (q ? options.filter((o) => o.city.includes(q) || (o.sub && o.sub.includes(q))) : options).slice(0, 8);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const regionCodes = tripType === "domestic" ? ["kr"] : INTERNATIONAL_REGION_CODES;
+        setSuggestions(await fetchCitySuggestions(q, { regionCodes }));
+      } catch {
+        setSuggestions([]);
+      }
+    }, 200);
+    return () => clearTimeout(debounceRef.current);
+  }, [query, isLoaded, tripType]);
+
+  function pick(s) {
+    skipNextFetchRef.current = true;
+    setQuery(s.city);
+    setSuggestions([]);
+    setOpen(false);
+  }
 
   return (
     <div className="field" style={{ position: "relative" }}>
@@ -269,7 +294,7 @@ function DestinationField({ tripType, defaultValue }) {
         onBlur={() => setOpen(false)}
         autoComplete="off"
       />
-      {open && filtered.length > 0 && (
+      {open && suggestions.length > 0 && (
         <div
           style={{
             position: "absolute", top: "100%", left: 0, right: 0, zIndex: 30,
@@ -278,20 +303,20 @@ function DestinationField({ tripType, defaultValue }) {
             boxShadow: "0 8px 24px rgba(0,0,0,.25)",
           }}
         >
-          {filtered.map((o, i) => (
+          {suggestions.map((s, i) => (
             <button
-              key={o.sub ? `${o.sub}-${o.city}` : o.city}
+              key={`${s.city}-${i}`}
               type="button"
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => { setQuery(o.city); setOpen(false); }}
+              onClick={() => pick(s)}
               style={{
                 display: "block", width: "100%", textAlign: "left", background: "none",
-                border: "none", borderBottom: i < filtered.length - 1 ? "1px solid var(--line)" : "none",
+                border: "none", borderBottom: i < suggestions.length - 1 ? "1px solid var(--line)" : "none",
                 padding: "10px 12px", cursor: "pointer", color: "var(--ink)", font: "inherit",
               }}
             >
-              <div>{o.city}</div>
-              {o.sub && <div style={{ fontSize: 12.5, color: "var(--ink-soft)" }}>{o.sub}</div>}
+              <div>{s.city}</div>
+              {s.sub && <div style={{ fontSize: 12.5, color: "var(--ink-soft)" }}>{s.sub}</div>}
             </button>
           ))}
         </div>
