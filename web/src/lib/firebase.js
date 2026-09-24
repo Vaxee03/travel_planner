@@ -4,8 +4,8 @@ import { getStorage } from "firebase/storage";
 import { getFunctions } from "firebase/functions";
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword,
-  createUserWithEmailAndPassword, EmailAuthProvider, linkWithCredential,
-  signOut, GoogleAuthProvider, OAuthProvider, signInWithPopup, linkWithPopup,
+  createUserWithEmailAndPassword,
+  signOut, GoogleAuthProvider, OAuthProvider, signInWithPopup,
 } from "firebase/auth";
 
 // Firebase console → Authentication → Sign-in method → Add new provider →
@@ -57,19 +57,7 @@ export function signIn(email, password) {
   return signInWithEmailAndPassword(auth, email, password);
 }
 
-/**
- * Creates an account for email/password. If the browser already holds an
- * anonymous session (e.g. from trying the app before signing up), this
- * LINKS the new credential to that same uid instead of minting a fresh one
- * — any trips already owned by that anonymous session carry over as-is,
- * rather than becoming orphaned under a uid nobody can sign back into.
- */
 export function signUp(email, password) {
-  const current = auth.currentUser;
-  if (current && current.isAnonymous) {
-    const credential = EmailAuthProvider.credential(email, password);
-    return linkWithCredential(current, credential);
-  }
   return createUserWithEmailAndPassword(auth, email, password);
 }
 
@@ -77,25 +65,12 @@ export function signOutUser() {
   return signOut(auth);
 }
 
-/**
- * Sign in (or, if currently anonymous, upgrade-in-place via linkWithPopup so
- * existing trips carry over — same rationale as signUp's email/password path)
- * with a popup-based provider.
- */
-function socialSignIn(provider) {
-  const current = auth.currentUser;
-  if (current && current.isAnonymous) {
-    return linkWithPopup(current, provider);
-  }
-  return signInWithPopup(auth, provider);
-}
-
 export function signInWithGoogle() {
-  return socialSignIn(new GoogleAuthProvider());
+  return signInWithPopup(auth, new GoogleAuthProvider());
 }
 
 export function signInWithKakao() {
-  return socialSignIn(new OAuthProvider(KAKAO_OIDC_PROVIDER_ID));
+  return signInWithPopup(auth, new OAuthProvider(KAKAO_OIDC_PROVIDER_ID));
 }
 
 /** Korean messages for the Firebase Auth error codes users actually hit. */

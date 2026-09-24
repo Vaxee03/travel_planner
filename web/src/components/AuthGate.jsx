@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { signIn, signUp, signInWithGoogle, signInWithKakao, authErrorMessage } from "../lib/firebase";
 
-export default function AuthGate({ initialMode = "login", onCancel, onAuthed }) {
-  const [mode, setMode] = useState(initialMode); // "login" | "signup"
+export default function AuthGate({ onAuthed }) {
+  const [mode, setMode] = useState("login"); // "login" | "signup"
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const mountedRef = useRef(true);
@@ -28,9 +28,6 @@ export default function AuthGate({ initialMode = "login", onCancel, onAuthed }) 
     setError(null);
     try {
       const cred = mode === "signup" ? await signUp(email, password) : await signIn(email, password);
-      // linkWithCredential/linkWithPopup (used when upgrading an anonymous
-      // session) don't reliably re-fire onAuthStateChanged since the uid
-      // doesn't change, so push the resulting user up explicitly too.
       onAuthed?.(cred.user);
     } catch (err) {
       setError(authErrorMessage(err));
@@ -102,11 +99,6 @@ export default function AuthGate({ initialMode = "login", onCancel, onAuthed }) 
           <button type="submit" className="btn btn-primary" style={{ width: "100%", justifyContent: "center", marginTop: 8 }} disabled={loading}>
             {loading ? "처리 중…" : mode === "signup" ? "회원가입" : "로그인"}
           </button>
-          {onCancel && (
-            <button type="button" className="back-link" style={{ marginTop: 14, marginBottom: 0, justifyContent: "center", width: "100%" }} onClick={onCancel}>
-              나중에 하기
-            </button>
-          )}
         </form>
 
         <div className="btn-row" style={{ margin: "18px 0", color: "var(--ink-soft)", fontSize: 12.5 }}>

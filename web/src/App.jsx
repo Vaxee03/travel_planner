@@ -26,13 +26,17 @@ export default function App() {
   const [tab, setTab] = useState("itinerary");
   const [dayIdx, setDayIdx] = useState(null);
   const [modal, setModal] = useState(null);
-  const [showUpgrade, setShowUpgrade] = useState(false);
   const [nickname, setNicknameState] = useState("");
   const nicknamePromptedRef = useRef(null);
 
   useEffect(() => {
     if (!firebaseReady) { setAuthError("Firebase 설정이 없어요. web/.env.local을 채워주세요."); setAuthResolved(true); return; }
     const unsub = watchAuth((u) => {
+      // Guest/anonymous auth isn't a supported sign-in method anymore — a
+      // browser that still has an old cached anonymous session (from before
+      // this was removed) gets signed straight back out instead of silently
+      // continuing as a ghost guest.
+      if (u?.isAnonymous) { signOutUser(); return; }
       // A different account (or a sign-out) can't still be looking at the
       // previous account's trip screen, so drop back to the trip list.
       setUser((prev) => {
@@ -44,8 +48,7 @@ export default function App() {
     return unsub;
   }, []);
 
-  // Once a real (non-anonymous) user is signed in, consume a pending
-  // ?join=<tripId> link from the URL exactly once.
+  // Consume a pending ?join=<tripId> link from the URL exactly once.
   useEffect(() => {
     if (!user) return;
     const params = new URLSearchParams(window.location.search);
@@ -56,12 +59,11 @@ export default function App() {
       .then(() => window.history.replaceState(null, "", window.location.pathname));
   }, [user]);
 
-  // Non-guest accounts need a nickname for other members to see them by; if
-  // one hasn't been set yet (brand-new signup or a pre-existing account from
-  // before this feature), prompt once per login — skippable, since the rest
-  // of the app falls back to a default label when it's blank.
+  // If a nickname hasn't been set yet (brand-new signup or a pre-existing
+  // account from before this feature), prompt once per login — skippable,
+  // since the rest of the app falls back to a default label when it's blank.
   useEffect(() => {
-    if (!user || user.isAnonymous) { setNicknameState(""); return; }
+    if (!user) { setNicknameState(""); return; }
     let cancelled = false;
     fetchNickname(user.uid).then((nick) => {
       if (cancelled) return;
@@ -301,13 +303,7 @@ export default function App() {
             <div className="subline">여러 여행을 관리하고, 다녀온 여행엔 후기와 사진을 남겨보세요.</div>
           </div>
           <div className="btn-row" style={{ alignItems: "center" }}>
-            {user && user.isAnonymous && (
-              <span className="btn-row" style={{ alignItems: "center" }}>
-                <span className="section-note">게스트로 이용 중</span>
-                <button className="btn btn-sm btn-primary" onClick={() => setShowUpgrade(true)}>계정 만들기</button>
-              </span>
-            )}
-            {user && !user.isAnonymous && (
+            {user && (
               <span className="btn-row" style={{ alignItems: "center" }}>
                 <span style={{ color: "#fff", fontSize: 18, fontWeight: 700 }}>{nickname || "닉네임 없음"}</span>
                 <button className="btn" onClick={() => setModal({ type: "edit-nickname", currentNickname: nickname })}>닉네임 수정</button>
@@ -324,8 +320,6 @@ export default function App() {
         <div className="empty">불러오는 중이에요…</div>
       ) : !user ? (
         <AuthGate onAuthed={setUser} />
-      ) : user.isAnonymous && showUpgrade ? (
-        <AuthGate initialMode="signup" onCancel={() => setShowUpgrade(false)} onAuthed={(u) => { setUser(u); setShowUpgrade(false); }} />
       ) : !tripsReady ? (
         <div className="empty">저장 기능을 불러오는 중이에요…</div>
       ) : screen === "home" ? (
