@@ -299,7 +299,7 @@ export default function App() {
             )}
             {user && !user.isAnonymous && (
               <span className="btn-row" style={{ alignItems: "center" }}>
-                <span className="section-note">{nickname || "닉네임 없음"} · {user.email}</span>
+                <span className="section-note">{nickname || "닉네임 없음"}</span>
                 <button className="btn btn-sm" onClick={() => setModal({ type: "edit-nickname", currentNickname: nickname })}>닉네임 수정</button>
                 <button className="btn btn-sm" onClick={signOutUser}>로그아웃</button>
               </span>
