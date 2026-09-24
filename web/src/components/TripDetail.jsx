@@ -47,7 +47,7 @@ export default function TripDetail({ trip, uid, tab, setTab, dayIdx, setDayIdx, 
           <button className="back-link" style={{ margin: 0 }} onClick={onBack}>← 여행 목록으로</button>
         </div>
         {memberIds.length > 0 && (
-          <div className="section-note" style={{ marginTop: 10 }}>
+          <div className="section-note" style={{ marginTop: -11 }}>
             동행자: {memberIds.map((uid, i) => (
               <span key={uid}>
                 {i > 0 ? ", " : ""}
