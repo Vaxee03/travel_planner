@@ -161,10 +161,17 @@ export default function ModalHost({ modal, trip, onClose, onSubmit }) {
     content = (
       <form onSubmit={handleSubmit} noValidate>
         <h3>{isEdit ? "닉네임 수정" : "닉네임을 설정해주세요"}</h3>
-        {!isEdit && <p style={{ margin: "0 0 14px", color: "var(--ink-soft)", fontSize: 13.5 }}>동행자들에게 보여질 이름이에요. 나중에 언제든 바꿀 수 있어요.</p>}
-        <Field name="nickname" label="닉네임" placeholder="예: 여행러버" defaultValue={modal.currentNickname || ""} />
+        {!isEdit && <p style={{ margin: "0 0 14px", color: "var(--ink-soft)", fontSize: 13.5 }}>동행자들에게 보여질 이름이에요. 마음에 안 들면 자유롭게 바꾸고, 나중에 언제든 다시 바꿀 수 있어요.</p>}
+        <Field name="nickname" label="닉네임" placeholder="예: 여행러버" defaultValue={isEdit ? (modal.currentNickname || "") : modal.suggested || ""} />
         <FormNote message={formError} />
-        <Actions submitLabel="저장" onClose={onClose} />
+        {isEdit ? (
+          <Actions submitLabel="저장" onClose={onClose} />
+        ) : (
+          <div className="modal-actions">
+            <button type="button" className="btn" onClick={() => onSubmit(modal, { nickname: modal.suggested || "" })}>나중에 하기</button>
+            <button type="submit" className="btn btn-primary">저장</button>
+          </div>
+        )}
       </form>
     );
   } else if (modal.type === "edit-review") {

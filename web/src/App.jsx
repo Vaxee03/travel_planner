@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { firebaseReady, watchAuth, signOutUser } from "./lib/firebase";
 import { subscribeTrips, createTrip, saveTrip, deleteTrip, joinTrip } from "./lib/tripsApi";
 import { fetchNickname, setNickname } from "./lib/users";
+import { randomNickname } from "./lib/randomNickname";
 import Home from "./components/Home";
 import TripDetail from "./components/TripDetail";
 import ModalHost from "./components/Modals";
@@ -65,7 +66,7 @@ export default function App() {
       setNicknameState(nick);
       if (!nick && nicknamePromptedRef.current !== user.uid) {
         nicknamePromptedRef.current = user.uid;
-        setModal({ type: "set-nickname" });
+        setModal({ type: "set-nickname", suggested: randomNickname() });
       }
     });
     return () => { cancelled = true; };
