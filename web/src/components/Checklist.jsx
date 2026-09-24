@@ -2,8 +2,7 @@ import { useNicknames } from "../lib/useNicknames";
 
 export default function Checklist({ trip, openModal, requestDelete, toggleCheck }) {
   const items = trip.checklist || [];
-  const showAuthor = (trip.memberIds || []).length > 1;
-  const nicknames = useNicknames(items.map((it) => it.createdBy));
+  const nicknames = useNicknames(items.map((it) => it.assignedTo));
   return (
     <section>
       <div className="section-head">
@@ -20,8 +19,8 @@ export default function Checklist({ trip, openModal, requestDelete, toggleCheck 
                 <span className="box">{it.done ? "✓" : ""}</span>
               </button>
               <span className="check-text">{it.text}</span>
-              {showAuthor && it.createdBy && (
-                <span className="section-note" style={{ flexShrink: 0 }}>{nicknames[it.createdBy] || "이름 없는 동행자"}</span>
+              {it.assignedTo && (
+                <span className="section-note" style={{ flexShrink: 0 }}>👤 {nicknames[it.assignedTo] || "이름 없는 동행자"}</span>
               )}
               <button className="btn-ghost btn-sm btn-danger" onClick={() => requestDelete("delete-check", "이 항목을 삭제할까요?", { idx })}>삭제</button>
             </div>

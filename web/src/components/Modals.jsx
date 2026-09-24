@@ -7,12 +7,35 @@ import { EXTRA_INTERNATIONAL_DESTINATIONS } from "../lib/extraDestinations";
 import MapPicker from "./MapPicker";
 import InviteCard from "./InviteCard";
 import LocationViewer from "./LocationViewer";
+import { useNicknames } from "../lib/useNicknames";
+import { DEFAULT_NICKNAME } from "../lib/users";
 
 function Field({ name, label, type = "text", placeholder, required, defaultValue, min }) {
   return (
     <div className="field">
       <label>{label}</label>
       <input name={name} type={type} placeholder={placeholder} required={required} defaultValue={defaultValue} min={min} />
+    </div>
+  );
+}
+
+/** Optional "담당자" picker — only rendered when there's actually more than
+ * one member to assign to, since a solo trip has no one to tag. Left
+ * unselected by default; the checklist item only ever shows a nickname tag
+ * when someone explicitly picks a name here. */
+function AssigneeField({ trip }) {
+  const memberIds = trip?.memberIds || [];
+  const nicknames = useNicknames(memberIds);
+  if (memberIds.length <= 1) return null;
+  return (
+    <div className="field">
+      <label>담당자 (선택)</label>
+      <select name="assignedTo" defaultValue="">
+        <option value="">선택 안 함</option>
+        {memberIds.map((uid) => (
+          <option key={uid} value={uid}>{nicknames[uid] || DEFAULT_NICKNAME}</option>
+        ))}
+      </select>
     </div>
   );
 }
@@ -125,6 +148,7 @@ export default function ModalHost({ modal, trip, onClose, onSubmit }) {
       <form onSubmit={handleSubmit} noValidate>
         <h3>준비물 추가</h3>
         <Field name="text" label="항목" placeholder="예: 온천용 수건" required />
+        <AssigneeField trip={trip} />
         <FormNote message={formError} />
         <Actions submitLabel="추가" onClose={onClose} />
       </form>

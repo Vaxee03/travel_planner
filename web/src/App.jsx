@@ -227,7 +227,9 @@ export default function App() {
     if (m.type === "add-check") {
       const t = structuredClone(trip);
       t.checklist = t.checklist || [];
-      t.checklist.push({ text: values.text, done: false, createdBy: user.uid });
+      const checkItem = { text: values.text, done: false };
+      if (values.assignedTo) checkItem.assignedTo = values.assignedTo;
+      t.checklist.push(checkItem);
       await saveTrip(t);
       closeModal();
       return;

@@ -220,12 +220,12 @@ section{ margin-bottom:44px; }
 /* ---- Checklist ---- */
 .checklist{ display:grid; grid-template-columns:1fr 1fr; gap:10px 16px; }
 @media (max-width:560px){ .checklist{ grid-template-columns:1fr; } }
-.check-item{ display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:11px 12px; font-size:15.5px; }
+.check-item{ display:flex; align-items:center; flex-wrap:wrap; gap:6px 10px; background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:11px 12px; font-size:15.5px; }
 .check-item button.box-btn{ all:unset; cursor:pointer; flex:0 0 auto; }
 .box{ width:18px; height:18px; border-radius:5px; border:1.5px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:13.5px; color:#fff; }
 .check-item.done .box{ border-color:var(--confirmed); background:var(--confirmed); }
 .check-item.done .check-text{ color:var(--ink-soft); text-decoration:line-through; }
-.check-text{ flex:1 1 auto; }
+.check-text{ flex:1 1 auto; min-width:80px; }
 
 /* ---- Review ---- */
 .review-locked{ display:flex; gap:10px; align-items:flex-start; font-size:15.5px; color:var(--ink-soft); background:var(--surface-2); border-radius:12px; padding:18px 20px; }
