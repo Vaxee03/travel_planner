@@ -9,6 +9,7 @@ import InviteCard from "./InviteCard";
 import LocationViewer from "./LocationViewer";
 import { useNicknames } from "../lib/useNicknames";
 import { DEFAULT_NICKNAME } from "../lib/users";
+import { PERMISSION_CATEGORIES } from "../lib/permissions";
 
 function Field({ name, label, type = "text", placeholder, required, defaultValue, min }) {
   return (
@@ -37,6 +38,48 @@ function AssigneeField({ trip }) {
         ))}
       </select>
     </div>
+  );
+}
+
+/** 방장 only — lets them grant individual permission categories to each
+ * other member. Checkbox names are perm_<uid>_<category>; App.jsx's
+ * handleModalSubmit reconstructs the memberPermissions map from whichever
+ * ones came back checked in the submitted FormData. */
+function PermissionsForm({ trip, onSubmit, onClose }) {
+  const memberIds = (trip?.memberIds || []).filter((uid) => uid !== trip?.ownerId);
+  const nicknames = useNicknames(memberIds);
+  const current = trip?.memberPermissions || {};
+
+  return (
+    <form onSubmit={onSubmit} noValidate>
+      <h3>권한 관리</h3>
+      <p style={{ margin: "0 0 16px", color: "var(--ink-soft)", fontSize: 13.5 }}>
+        방장 외 동행자는 기본적으로 체크리스트 체크, 맛집 추천, 후기 작성만 가능해요. 아래에서 동행자별로 추가 권한을 열어줄 수 있어요.
+      </p>
+      {memberIds.length === 0 ? (
+        <div className="empty">아직 방장 외 동행자가 없어요.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {memberIds.map((uid) => {
+            const granted = current[uid] || [];
+            return (
+              <div className="card" key={uid}>
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>{nicknames[uid] || DEFAULT_NICKNAME}</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {PERMISSION_CATEGORIES.map((c) => (
+                    <label key={c.key} style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 400, color: "var(--ink)" }}>
+                      <input type="checkbox" name={`perm_${uid}_${c.key}`} defaultChecked={granted.includes(c.key)} style={{ width: "auto", flexShrink: 0 }} />
+                      {c.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <Actions submitLabel="저장" onClose={onClose} />
+    </form>
   );
 }
 
@@ -178,6 +221,8 @@ export default function ModalHost({ modal, trip, onClose, onSubmit }) {
     );
   } else if (modal.type === "invite") {
     content = <InviteCard trip={trip} onClose={onClose} />;
+  } else if (modal.type === "manage-permissions") {
+    content = <PermissionsForm trip={trip} onSubmit={handleSubmit} onClose={onClose} />;
   } else if (modal.type === "view-location") {
     content = <LocationViewer location={modal.location} label={modal.label} onClose={onClose} />;
   } else if (modal.type === "set-nickname" || modal.type === "edit-nickname") {
@@ -212,7 +257,7 @@ export default function ModalHost({ modal, trip, onClose, onSubmit }) {
     );
   }
 
-  const isWide = modal.type === "add-item" || modal.type === "edit-item" || modal.type === "invite" || modal.type === "view-location";
+  const isWide = modal.type === "add-item" || modal.type === "edit-item" || modal.type === "invite" || modal.type === "view-location" || modal.type === "manage-permissions";
   return (
     <div className="modal-overlay">
       <div className={"modal" + (isWide ? " modal-wide" : "")} onClick={(e) => e.stopPropagation()}>

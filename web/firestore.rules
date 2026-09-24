@@ -5,23 +5,54 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid in resource.data.memberIds;
       allow create: if request.auth != null && request.auth.uid in request.resource.data.memberIds;
 
-      // Existing members can edit trip content freely. A non-member may
-      // only perform the "join via link" update: add exactly their own
-      // uid to memberIds and touch nothing else (see joinTrip in tripsApi.js).
+      // Only the 방장 (trip creator) may delete — irreversible and affects
+      // every member, so it's never delegable.
+      allow delete: if request.auth != null && request.auth.uid == resource.data.ownerId;
+
+      // A non-member may perform the "join via link" update: add exactly
+      // their own uid to memberIds and touch nothing else (see joinTrip in
+      // tripsApi.js). Existing members go through the permission-gated path
+      // below instead.
       allow update: if request.auth != null && (
-        request.auth.uid in resource.data.memberIds ||
         (
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds']) &&
           request.resource.data.memberIds.hasAll(resource.data.memberIds) &&
           request.auth.uid in request.resource.data.memberIds &&
           request.resource.data.memberIds.size() == resource.data.memberIds.size() + 1
-        )
+        ) ||
+        (request.auth.uid in resource.data.memberIds && isAllowedTripUpdate())
       );
 
-      // Any member may delete, matching the unrestricted edit access members
-      // already have via allow update above (an owner-only check here was a
-      // false boundary: members can already clear/overwrite all trip data).
-      allow delete: if request.auth != null && request.auth.uid in resource.data.memberIds;
+      function isOwner() {
+        return request.auth.uid == resource.data.ownerId;
+      }
+
+      // Whichever of these top-level fields didn't actually change (same
+      // value already stored) impose no constraint here — e.g. toggling a
+      // checklist item's checked state resaves the whole trip document
+      // client-side, but only checklistDone's value differs, so the
+      // checklist-permission check below never even applies to that write.
+      function hasPerm(category) {
+        return isOwner() || (
+          ('memberPermissions' in resource.data) &&
+          category in resource.data.memberPermissions.get(request.auth.uid, [])
+        );
+      }
+
+      // 방장(trip creator)이 대부분의 기능을 기본적으로 갖고, 그 외 동행자는
+      // memberPermissions로 개별 위임받은 항목만 수정 가능. 체크리스트 체크
+      // 표시(checklistDone), AI 맛집 추천 결과 캐시, 후기 게시판은 위임 없이
+      // 항상 모든 멤버가 건드릴 수 있어야 해서 어떤 그룹에도 넣지 않음 —
+      // 이 함수가 다루지 않는 필드는 제약이 없다는 뜻.
+      function isAllowedTripUpdate() {
+        let changed = request.resource.data.diff(resource.data).affectedKeys();
+        return
+          (!changed.hasAny(['title', 'destination', 'startDate', 'endDate', 'travelers', 'budgetTotal', 'tripType', 'ownerId', 'memberPermissions', 'memberIds']) || isOwner()) &&
+          (!changed.hasAny(['days', 'itineraryMemo']) || hasPerm('itinerary')) &&
+          (!changed.hasAny(['budgetItems']) || hasPerm('budget')) &&
+          (!changed.hasAny(['checklist']) || hasPerm('checklist')) &&
+          (!changed.hasAny(['bookings']) || hasPerm('bookings'));
+      }
     }
 
     // Account-level nickname. Readable by any signed-in user (needed to show

@@ -1,6 +1,6 @@
 import { fmtMoney } from "../lib/utils";
 
-export default function Budget({ trip, openModal, requestDelete }) {
+export default function Budget({ trip, openModal, requestDelete, canEdit }) {
   const items = trip.budgetItems || [];
   const spent = items.reduce((s, it) => s + (Number(it.amount) || 0), 0);
   const total = Number(trip.budgetTotal) || 0;
@@ -54,7 +54,7 @@ export default function Budget({ trip, openModal, requestDelete }) {
       <section>
         <div className="section-head">
           <h2>지출 내역</h2>
-          <button className="btn btn-primary btn-sm" onClick={() => openModal({ type: "add-budget" })}>+ 항목 추가</button>
+          {canEdit && <button className="btn btn-primary btn-sm" onClick={() => openModal({ type: "add-budget" })}>+ 항목 추가</button>}
         </div>
         {items.length === 0 ? (
           <div className="empty">아직 등록된 지출이 없어요.</div>
@@ -65,7 +65,9 @@ export default function Budget({ trip, openModal, requestDelete }) {
                 <span>{it.category || "기타"}{it.memo ? " · " + it.memo : ""}</span>
                 <span className="btn-row" style={{ alignItems: "center" }}>
                   <span className="nums" style={{ color: "var(--ink)", fontFamily: "'JetBrains Mono',monospace" }}>{fmtMoney(it.amount)}원</span>
-                  <button className="btn-ghost btn-sm btn-danger" onClick={() => requestDelete("delete-budget", "이 지출 항목을 삭제할까요?", { idx })}>삭제</button>
+                  {canEdit && (
+                    <button className="btn-ghost btn-sm btn-danger" onClick={() => requestDelete("delete-budget", "이 지출 항목을 삭제할까요?", { idx })}>삭제</button>
+                  )}
                 </span>
               </div>
             ))}

@@ -17,7 +17,7 @@ const TABS = [
   { key: "restaurants", label: "맛집 추천" },
 ];
 
-export default function TripDetail({ trip, uid, tab, setTab, dayIdx, setDayIdx, openModal, requestDelete, toggleCheck, reorderDayItems, onBack, onEditTrip, onDeleteTrip }) {
+export default function TripDetail({ trip, uid, perms, tab, setTab, dayIdx, setDayIdx, openModal, requestDelete, toggleCheck, reorderDayItems, onBack, onEditTrip, onDeleteTrip }) {
   const st = tripStatus(trip);
   const dday = ddayLabel(trip);
   const canReview = st === "completed";
@@ -32,8 +32,13 @@ export default function TripDetail({ trip, uid, tab, setTab, dayIdx, setDayIdx, 
           <div className="btn-row">
             <button className="btn btn-sm" onClick={() => openModal({ type: "invite" })}>🎟 동행자 초대</button>
             <button className="btn btn-sm" onClick={() => downloadTripIcs(trip)}>📅 캘린더로 내보내기</button>
-            <button className="btn btn-sm" onClick={onEditTrip}>여행 정보 수정</button>
-            <button className="btn btn-sm btn-danger" onClick={onDeleteTrip}>삭제</button>
+            {perms.isOwner && (
+              <>
+                <button className="btn btn-sm" onClick={() => openModal({ type: "manage-permissions" })}>🔑 권한 관리</button>
+                <button className="btn btn-sm" onClick={onEditTrip}>여행 정보 수정</button>
+                <button className="btn btn-sm btn-danger" onClick={onDeleteTrip}>삭제</button>
+              </>
+            )}
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
@@ -52,7 +57,7 @@ export default function TripDetail({ trip, uid, tab, setTab, dayIdx, setDayIdx, 
               <span key={uid}>
                 {i > 0 ? ", " : ""}
                 {nicknames[uid] || DEFAULT_NICKNAME}
-                {uid === trip.ownerId ? " 👑" : ""}
+                {uid === trip.ownerId ? " 👑 방장" : ""}
               </span>
             ))}
           </div>
@@ -81,10 +86,10 @@ export default function TripDetail({ trip, uid, tab, setTab, dayIdx, setDayIdx, 
         </span>
       </div>
 
-      {tab === "itinerary" && <Itinerary trip={trip} dayIdx={dayIdx} setDayIdx={setDayIdx} openModal={openModal} requestDelete={requestDelete} reorderDayItems={reorderDayItems} />}
-      {tab === "budget" && <Budget trip={trip} openModal={openModal} requestDelete={requestDelete} />}
-      {tab === "checklist" && <Checklist trip={trip} openModal={openModal} requestDelete={requestDelete} toggleCheck={toggleCheck} />}
-      {tab === "bookings" && <Bookings trip={trip} openModal={openModal} requestDelete={requestDelete} />}
+      {tab === "itinerary" && <Itinerary trip={trip} dayIdx={dayIdx} setDayIdx={setDayIdx} openModal={openModal} requestDelete={requestDelete} reorderDayItems={reorderDayItems} canEdit={perms.itinerary} />}
+      {tab === "budget" && <Budget trip={trip} openModal={openModal} requestDelete={requestDelete} canEdit={perms.budget} />}
+      {tab === "checklist" && <Checklist trip={trip} openModal={openModal} requestDelete={requestDelete} toggleCheck={toggleCheck} canEdit={perms.checklist} />}
+      {tab === "bookings" && <Bookings trip={trip} openModal={openModal} requestDelete={requestDelete} canEdit={perms.bookings} />}
       {tab === "restaurants" && <Restaurants trip={trip} />}
       {tab === "review" && <Review trip={trip} uid={uid} canReview={canReview} openModal={openModal} requestDelete={requestDelete} />}
     </>

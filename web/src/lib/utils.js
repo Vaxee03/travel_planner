@@ -7,9 +7,33 @@ const DEFAULT_CHECKLIST_DOMESTIC = [
   "숙소 예약 확인서", "기차/버스표 예매 확인", "보조배터리 & 충전기", "상비약", "여벌 옷 & 세면도구", "카드/현금",
 ];
 
+export function makeChecklistId() {
+  return crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+/** Checked/unchecked state lives in trip.checklistDone (keyed by this id),
+ * separate from the checklist array itself — see ensureChecklistIds below for
+ * why. Items saved before that split has an id fall back to a position-based
+ * key; it's only unstable across a delete/reorder of an item that was never
+ * migrated to a real id, which self-heals the next time anyone with
+ * checklist-edit permission adds or removes an item (ensureChecklistIds runs
+ * then). */
+export function checklistItemId(item, idx) {
+  return item?.id || `idx-${idx}`;
+}
+
+/** Backfills a stable id onto any legacy checklist item that doesn't have
+ * one yet. Only called from add/delete-item flows (which already require
+ * checklist permission), never from the checkbox toggle — toggling only ever
+ * writes to trip.checklistDone, which every member (not just 방장 /
+ * permission-holders) is always allowed to touch. */
+export function ensureChecklistIds(items) {
+  return (items || []).map((it) => (it.id ? it : { ...it, id: makeChecklistId() }));
+}
+
 export function defaultChecklist(tripType) {
   const items = tripType === "domestic" ? DEFAULT_CHECKLIST_DOMESTIC : DEFAULT_CHECKLIST_INTERNATIONAL;
-  return items.map((text) => ({ text, done: false }));
+  return items.map((text) => ({ id: makeChecklistId(), text }));
 }
 
 export function todayStr() {
@@ -96,6 +120,8 @@ export function emptyTrip(overrides) {
     tripType: "international",
     days: [], budgetItems: [], bookings: [],
     checklist: defaultChecklist(overrides?.tripType),
+    checklistDone: {},
+    memberPermissions: {},
     review: { text: "", photos: [] },
     ...overrides,
   };

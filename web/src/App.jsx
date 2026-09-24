@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { firebaseReady, watchAuth, signOutUser } from "./lib/firebase";
-import { subscribeTrips, createTrip, saveTrip, deleteTrip, joinTrip } from "./lib/tripsApi";
+import { subscribeTrips, createTrip, saveTrip, deleteTrip, joinTrip, setChecklistDone } from "./lib/tripsApi";
 import { fetchNickname, setNickname } from "./lib/users";
 import { randomNickname } from "./lib/randomNickname";
+import { checklistItemId, ensureChecklistIds, makeChecklistId } from "./lib/utils";
+import { computePerms, PERMISSION_CATEGORIES } from "./lib/permissions";
 import Home from "./components/Home";
 import TripDetail from "./components/TripDetail";
 import ModalHost from "./components/Modals";
@@ -102,10 +104,15 @@ export default function App() {
     openTrip(code);
   }
 
+  // A targeted field update (not the usual clone-whole-trip-and-saveTrip
+  // pattern), so this stays allowed for every member regardless of checklist
+  // permission and can't get caught up in an unrelated stale-field conflict
+  // (see setChecklistDone's doc comment).
   function toggleCheck(idx) {
-    const t = structuredClone(trip);
-    t.checklist[idx].done = !t.checklist[idx].done;
-    saveTrip(t);
+    const item = trip.checklist[idx];
+    const id = checklistItemId(item, idx);
+    const wasDone = trip.checklistDone?.[id] ?? item.done ?? false;
+    setChecklistDone(tripId, id, !wasDone);
   }
 
   function reorderDayItems(dayIdx, newItems) {
@@ -134,7 +141,9 @@ export default function App() {
         await saveTrip(t);
       } else if (m.onYes === "delete-check") {
         const t = structuredClone(trip);
+        const id = checklistItemId(t.checklist[m.idx], m.idx);
         t.checklist.splice(m.idx, 1);
+        if (t.checklistDone) delete t.checklistDone[id];
         await saveTrip(t);
       } else if (m.onYes === "delete-booking") {
         const t = structuredClone(trip);
@@ -155,6 +164,19 @@ export default function App() {
         await setNickname(user.uid, nick);
         setNicknameState(nick);
       }
+      closeModal();
+      return;
+    }
+    if (m.type === "manage-permissions") {
+      const t = structuredClone(trip);
+      const memberIds = (t.memberIds || []).filter((id) => id !== t.ownerId);
+      const next = {};
+      memberIds.forEach((id) => {
+        const cats = PERMISSION_CATEGORIES.filter((c) => values[`perm_${id}_${c.key}`] === "on").map((c) => c.key);
+        if (cats.length) next[id] = cats;
+      });
+      t.memberPermissions = next;
+      await saveTrip(t);
       closeModal();
       return;
     }
@@ -226,8 +248,11 @@ export default function App() {
     }
     if (m.type === "add-check") {
       const t = structuredClone(trip);
-      t.checklist = t.checklist || [];
-      const checkItem = { text: values.text, done: false };
+      // Backfill ids onto any pre-existing legacy items in the same write —
+      // this write already requires checklist permission, so it's a free
+      // opportunity to migrate the trip off the position-based fallback id.
+      t.checklist = ensureChecklistIds(t.checklist);
+      const checkItem = { id: makeChecklistId(), text: values.text };
       if (values.assignedTo) checkItem.assignedTo = values.assignedTo;
       t.checklist.push(checkItem);
       await saveTrip(t);
@@ -299,6 +324,7 @@ export default function App() {
         <TripDetail
           trip={trip}
           uid={user.uid}
+          perms={computePerms(trip, user.uid)}
           tab={tab}
           setTab={setTab}
           dayIdx={dayIdx}

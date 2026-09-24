@@ -52,6 +52,15 @@ export function joinTrip(tripId, uid) {
   return updateDoc(doc(db, "trips", tripId), { memberIds: arrayUnion(uid) });
 }
 
+/** A targeted field update (not the usual read-whole-trip/mutate/saveTrip
+ * pattern) so that toggling a checklist box — the one action every member is
+ * always allowed to do regardless of permissions — can never get rejected by
+ * the security rules just because some other unrelated field in this
+ * member's local trip snapshot happened to be stale relative to the server. */
+export function setChecklistDone(tripId, itemId, done) {
+  return updateDoc(doc(db, "trips", tripId), { [`checklistDone.${itemId}`]: done });
+}
+
 export async function uploadReviewPhoto(tripId, file) {
   const path = `trips/${tripId}/review/${Date.now()}_${file.name}`;
   const storageRef = ref(storage, path);

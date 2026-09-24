@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { fmtDate, mapUrl, splitItems } from "../lib/utils";
 import { saveTrip } from "../lib/tripsApi";
 
-export default function Itinerary({ trip, dayIdx, setDayIdx, openModal, requestDelete, reorderDayItems }) {
+export default function Itinerary({ trip, dayIdx, setDayIdx, openModal, requestDelete, reorderDayItems, canEdit }) {
   const days = trip.days || [];
 
   if (dayIdx !== null && dayIdx < days.length) {
@@ -14,6 +14,7 @@ export default function Itinerary({ trip, dayIdx, setDayIdx, openModal, requestD
         openModal={openModal}
         requestDelete={requestDelete}
         reorderDayItems={reorderDayItems}
+        canEdit={canEdit}
       />
     );
   }
@@ -23,9 +24,11 @@ export default function Itinerary({ trip, dayIdx, setDayIdx, openModal, requestD
       <section>
         <div className="section-head">
           <h2>일자별 일정</h2>
-          <span className="btn-row">
-            <button className="btn btn-primary btn-sm" onClick={() => openModal({ type: "add-day" })}>+ 날짜 추가</button>
-          </span>
+          {canEdit && (
+            <span className="btn-row">
+              <button className="btn btn-primary btn-sm" onClick={() => openModal({ type: "add-day" })}>+ 날짜 추가</button>
+            </span>
+          )}
         </div>
 
         {days.length === 0 ? (
@@ -53,15 +56,16 @@ export default function Itinerary({ trip, dayIdx, setDayIdx, openModal, requestD
         )}
       </section>
 
-      <ItineraryMemo trip={trip} />
+      <ItineraryMemo trip={trip} canEdit={canEdit} />
     </>
   );
 }
 
 /** A free-form scratchpad for the whole trip (packing ideas, things to check,
  * changes to remember) — shared by every member, autosaved on blur so it
- * doesn't need its own save button. */
-function ItineraryMemo({ trip }) {
+ * doesn't need its own save button. Read-only for members without itinerary
+ * permission (same gate as the rest of this tab). */
+function ItineraryMemo({ trip, canEdit }) {
   const [text, setText] = useState(trip.itineraryMemo || "");
   const [saving, setSaving] = useState(false);
   const dirtyRef = useRef(false);
@@ -92,6 +96,7 @@ function ItineraryMemo({ trip }) {
         rows={9}
         placeholder="자유롭게 메모를 남겨보세요 (준비물, 아이디어, 변경사항 등)"
         value={text}
+        disabled={!canEdit}
         onChange={(e) => { dirtyRef.current = true; setText(e.target.value); }}
         onBlur={handleBlur}
       />
@@ -99,7 +104,7 @@ function ItineraryMemo({ trip }) {
   );
 }
 
-function ItemBody({ trip, entry, dayIdx, openModal, requestDelete }) {
+function ItemBody({ trip, entry, dayIdx, openModal, requestDelete, canEdit }) {
   const it = entry.it;
   return (
     <>
@@ -121,10 +126,12 @@ function ItemBody({ trip, entry, dayIdx, openModal, requestDelete }) {
           </a>
         )}
       </span>
-      <span className="plan-actions">
-        <button className="btn-ghost btn-sm" onClick={() => openModal({ type: "edit-item", dayIdx, idx: entry.idx })}>수정</button>
-        <button className="btn-ghost btn-sm btn-danger" onClick={() => requestDelete("delete-item", "이 항목을 삭제할까요?", { dayIdx, idx: entry.idx })}>삭제</button>
-      </span>
+      {canEdit && (
+        <span className="plan-actions">
+          <button className="btn-ghost btn-sm" onClick={() => openModal({ type: "edit-item", dayIdx, idx: entry.idx })}>수정</button>
+          <button className="btn-ghost btn-sm btn-danger" onClick={() => requestDelete("delete-item", "이 항목을 삭제할까요?", { dayIdx, idx: entry.idx })}>삭제</button>
+        </span>
+      )}
     </>
   );
 }
@@ -134,7 +141,7 @@ function ItemBody({ trip, entry, dayIdx, openModal, requestDelete }) {
  * dragging only makes sense here where nothing else decides the order.
  * Reordering is done with Pointer Events (not native HTML5 drag-and-drop,
  * which iOS/Android browsers don't support for touch) so it works on phones. */
-function ReorderableItemList({ trip, dayIdx, entries, openModal, requestDelete, onReorder }) {
+function ReorderableItemList({ trip, dayIdx, entries, openModal, requestDelete, onReorder, canEdit }) {
   const [order, setOrder] = useState(entries.map((e) => e.idx));
   const [draggingIdx, setDraggingIdx] = useState(null);
   const rowRefs = useRef({});
@@ -202,23 +209,25 @@ function ReorderableItemList({ trip, dayIdx, entries, openModal, requestDelete, 
           ref={(el) => { rowRefs.current[originalIdx] = el; }}
           className={draggingIdx === originalIdx ? "dragging" : undefined}
         >
-          <span
-            className="drag-handle"
-            onPointerDown={(e) => onPointerDown(e, originalIdx)}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerUp}
-          >
-            ⠿
-          </span>
-          <ItemBody trip={trip} entry={byIdx[originalIdx]} dayIdx={dayIdx} openModal={openModal} requestDelete={requestDelete} />
+          {canEdit && (
+            <span
+              className="drag-handle"
+              onPointerDown={(e) => onPointerDown(e, originalIdx)}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onPointerCancel={onPointerUp}
+            >
+              ⠿
+            </span>
+          )}
+          <ItemBody trip={trip} entry={byIdx[originalIdx]} dayIdx={dayIdx} openModal={openModal} requestDelete={requestDelete} canEdit={canEdit} />
         </li>
       ))}
     </ul>
   );
 }
 
-function DayDetail({ trip, idx, setDayIdx, openModal, requestDelete, reorderDayItems }) {
+function DayDetail({ trip, idx, setDayIdx, openModal, requestDelete, reorderDayItems, canEdit }) {
   const d = trip.days[idx];
   const cls = d.status === "confirmed" ? "confirmed" : "open";
   const { timeEntries, labelEntries } = splitItems(d.items);
@@ -237,8 +246,12 @@ function DayDetail({ trip, idx, setDayIdx, openModal, requestDelete, reorderDayI
         <h2>{fmtDate(d.date)}</h2>
         <div className="btn-row">
           <span className={"status " + cls}>{cls === "confirmed" ? "확정" : "자유일정"}</span>
-          <button className="btn btn-sm" onClick={() => openModal({ type: "edit-day", idx })}>날짜 수정</button>
-          <button className="btn btn-sm btn-danger" onClick={() => requestDelete("delete-day", "이 날짜를 삭제할까요?", { idx })}>삭제</button>
+          {canEdit && (
+            <>
+              <button className="btn btn-sm" onClick={() => openModal({ type: "edit-day", idx })}>날짜 수정</button>
+              <button className="btn btn-sm btn-danger" onClick={() => requestDelete("delete-day", "이 날짜를 삭제할까요?", { idx })}>삭제</button>
+            </>
+          )}
         </div>
       </div>
       <div className="detail-sub">{d.summary || "세부 계획 미정"}</div>
@@ -253,7 +266,7 @@ function DayDetail({ trip, idx, setDayIdx, openModal, requestDelete, reorderDayI
               {timeEntries.length
                 ? timeEntries.map((e) => (
                     <li key={e.idx}>
-                      <ItemBody trip={trip} entry={e} dayIdx={idx} openModal={openModal} requestDelete={requestDelete} />
+                      <ItemBody trip={trip} entry={e} dayIdx={idx} openModal={openModal} requestDelete={requestDelete} canEdit={canEdit} />
                     </li>
                   ))
                 : <li style={{ color: "var(--ink-soft)", fontStyle: "italic" }}>시간이 정해진 항목이 없어요.</li>}
@@ -269,14 +282,17 @@ function DayDetail({ trip, idx, setDayIdx, openModal, requestDelete, reorderDayI
                 openModal={openModal}
                 requestDelete={requestDelete}
                 onReorder={handleReorderLabels}
+                canEdit={canEdit}
               />
             </div>
           )}
         </>
       )}
-      <div className="btn-row" style={{ marginTop: 16 }}>
-        <button className="btn btn-sm" onClick={() => openModal({ type: "add-item", dayIdx: idx })}>+ 항목 추가</button>
-      </div>
+      {canEdit && (
+        <div className="btn-row" style={{ marginTop: 16 }}>
+          <button className="btn btn-sm" onClick={() => openModal({ type: "add-item", dayIdx: idx })}>+ 항목 추가</button>
+        </div>
+      )}
     </div>
   );
 }
