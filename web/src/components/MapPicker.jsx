@@ -11,7 +11,7 @@ const DEFAULT_CENTER = { lat: 35.6812, lng: 139.7671 }; // Tokyo, reasonable def
  * { lat, lng, address }. address is filled in async via (reverse) geocoding
  * and may lag a moment behind the pin.
  */
-export default function MapPicker({ initialLocation, onPick, onClose }) {
+export default function MapPicker({ initialLocation, destination, onPick, onClose }) {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: apiKey || "",
@@ -25,10 +25,25 @@ export default function MapPicker({ initialLocation, onPick, onClose }) {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [searchError, setSearchError] = useState(null);
+  // Geocoded once from the trip's destination, so the map opens centered
+  // there and search results are biased nearby instead of defaulting to
+  // Tokyo / Korea regardless of where the trip actually is.
+  const [destCenter, setDestCenter] = useState(null);
   const geocoderRef = useRef(null);
   const sessionTokenRef = useRef(null);
   const debounceRef = useRef(null);
   const skipNextFetchRef = useRef(false);
+
+  useEffect(() => {
+    if (!isLoaded || !destination) return;
+    getGeocoder()?.geocode({ address: destination }, (results, status) => {
+      if (status === "OK" && results?.[0]) {
+        const loc = results[0].geometry.location;
+        setDestCenter({ lat: loc.lat(), lng: loc.lng() });
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded, destination]);
 
   function getGeocoder() {
     if (!geocoderRef.current && window.google) {
@@ -69,13 +84,18 @@ export default function MapPicker({ initialLocation, onPick, onClose }) {
 
     debounceRef.current = setTimeout(async () => {
       try {
+        const request = {
+          input: q,
+          language: "ko",
+          sessionToken: getSessionToken(),
+        };
+        // Soft-bias toward the trip's destination once we know where that is;
+        // it's a preference, not a hard filter, so users can still search
+        // elsewhere (e.g. a stopover) if they need to.
+        if (destCenter) request.locationBias = { center: destCenter, radius: 50000 };
+        else request.region = "KR";
         const { suggestions: results } =
-          await window.google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
-            input: q,
-            language: "ko",
-            region: "KR",
-            sessionToken: getSessionToken(),
-          });
+          await window.google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
         setSuggestions(results || []);
       } catch {
         // The new Places API may not be enabled on this project yet — fail
@@ -84,7 +104,7 @@ export default function MapPicker({ initialLocation, onPick, onClose }) {
       }
     }, 150);
     return () => clearTimeout(debounceRef.current);
-  }, [query, isLoaded]);
+  }, [query, isLoaded, destCenter]);
 
   async function pickSuggestion(suggestion) {
     setSuggestions([]);
@@ -213,8 +233,8 @@ export default function MapPicker({ initialLocation, onPick, onClose }) {
       <div className="map-picker-map">
         <GoogleMap
           mapContainerStyle={{ width: "100%", height: "100%" }}
-          center={marker || DEFAULT_CENTER}
-          zoom={marker ? 15 : 11}
+          center={marker || destCenter || DEFAULT_CENTER}
+          zoom={marker ? 15 : destCenter ? 12 : 11}
           onClick={handleClick}
           options={MAP_OPTIONS}
         >

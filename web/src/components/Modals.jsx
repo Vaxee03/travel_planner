@@ -108,7 +108,7 @@ export default function ModalHost({ modal, trip, onClose, onSubmit }) {
   } else if (modal.type === "add-item" || modal.type === "edit-item") {
     const isEdit = modal.type === "edit-item";
     const it = isEdit ? trip.days[modal.dayIdx].items[modal.idx] : { time: "", text: "" };
-    content = <ItemForm isEdit={isEdit} it={it} onSubmit={handleSubmit} onClose={onClose} />;
+    content = <ItemForm isEdit={isEdit} it={it} destination={trip.destination} onSubmit={handleSubmit} onClose={onClose} />;
   } else if (modal.type === "add-budget") {
     content = (
       <form onSubmit={handleSubmit} noValidate>
@@ -309,7 +309,10 @@ function DestinationField({ tripType, defaultValue }) {
 
   function pick(s) {
     skipNextFetchRef.current = true;
-    setQuery(s.city);
+    // Keep the country/region alongside the city (not just the bare name) so
+    // downstream consumers (map search bias, the restaurant AI prompt) get
+    // enough context to disambiguate same-named cities elsewhere in the world.
+    setQuery(s.sub ? `${s.city}, ${s.sub}` : s.city);
     setSuggestions([]);
     setOpen(false);
   }
@@ -357,7 +360,7 @@ function DestinationField({ tripType, defaultValue }) {
   );
 }
 
-function ItemForm({ isEdit, it, onSubmit, onClose }) {
+function ItemForm({ isEdit, it, destination, onSubmit, onClose }) {
   const initialKind = isEdit ? itemKind(it) : "time";
   const [kind, setKind] = useState(initialKind);
   const [error, setError] = useState(null);
@@ -392,7 +395,7 @@ function ItemForm({ isEdit, it, onSubmit, onClose }) {
         <Field name="labelValue" label="구분 텍스트" placeholder="예: 이동, 식사, 귀국" defaultValue={initialKind === "label" ? it.time : ""} />
       )}
       <Field name="text" label="내용" placeholder="예: 오와쿠다니 로프웨이" required defaultValue={it.text} />
-      <ItemLocationField initial={it.location} />
+      <ItemLocationField initial={it.location} destination={destination} />
       <FormNote message={error} />
       <Actions submitLabel={isEdit ? "저장" : "추가"} onClose={onClose} />
     </form>
@@ -401,7 +404,7 @@ function ItemForm({ isEdit, it, onSubmit, onClose }) {
 
 /** Lets the item form attach a picked map location. Stores it in a hidden
  * input so the surrounding <form> submit still captures it via FormData. */
-function ItemLocationField({ initial }) {
+function ItemLocationField({ initial, destination }) {
   const [location, setLocation] = useState(initial || null);
   const [picking, setPicking] = useState(false);
 
@@ -424,6 +427,7 @@ function ItemLocationField({ initial }) {
             <h3>위치 찍기</h3>
             <MapPicker
               initialLocation={location}
+              destination={destination}
               onClose={() => setPicking(false)}
               onPick={(loc) => { setLocation(loc); setPicking(false); }}
             />
