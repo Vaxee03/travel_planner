@@ -180,6 +180,16 @@ export default function App() {
       closeModal();
       return;
     }
+    if (m.type === "transfer-ownership") {
+      const t = structuredClone(trip);
+      const newOwnerId = values.newOwnerId;
+      if (newOwnerId && (t.memberIds || []).includes(newOwnerId)) {
+        t.ownerId = newOwnerId;
+      }
+      await saveTrip(t);
+      closeModal();
+      return;
+    }
     if (m.type === "add-trip") {
       const id = await createTrip(user.uid, {
         title: values.title, destination: values.destination,

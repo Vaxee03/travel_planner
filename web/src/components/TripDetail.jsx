@@ -35,6 +35,7 @@ export default function TripDetail({ trip, uid, perms, tab, setTab, dayIdx, setD
             {perms.isOwner && (
               <>
                 <button className="btn btn-sm" onClick={() => openModal({ type: "manage-permissions" })}>🔑 권한 관리</button>
+                <button className="btn btn-sm" onClick={() => openModal({ type: "transfer-ownership" })}>👑 방장 위임</button>
                 <button className="btn btn-sm" onClick={onEditTrip}>여행 정보 수정</button>
                 <button className="btn btn-sm btn-danger" onClick={onDeleteTrip}>삭제</button>
               </>

@@ -83,6 +83,37 @@ function PermissionsForm({ trip, onSubmit, onClose }) {
   );
 }
 
+/** 방장 only — hands ownerId to another member. The outgoing 방장 immediately
+ * drops to a regular member (no permission category is auto-granted to
+ * them), so they keep only the baseline actions until the new 방장 grants
+ * more via 권한 관리. */
+function TransferOwnershipForm({ trip, onSubmit, onClose }) {
+  const memberIds = (trip?.memberIds || []).filter((uid) => uid !== trip?.ownerId);
+  const nicknames = useNicknames(memberIds);
+
+  return (
+    <form onSubmit={onSubmit} noValidate>
+      <h3>방장 위임</h3>
+      <p style={{ margin: "0 0 16px", color: "var(--ink-soft)", fontSize: 13.5 }}>
+        선택한 동행자가 새 방장이 되고, 나는 일반 동행자가 돼요(권한 관리는 새 방장이 다시 해줘야 해요). 되돌릴 수 없으니 신중하게 선택해주세요.
+      </p>
+      {memberIds.length === 0 ? (
+        <div className="empty">위임할 동행자가 없어요.</div>
+      ) : (
+        <div className="field">
+          <label>새 방장</label>
+          <select name="newOwnerId" defaultValue={memberIds[0]}>
+            {memberIds.map((uid) => (
+              <option key={uid} value={uid}>{nicknames[uid] || DEFAULT_NICKNAME}</option>
+            ))}
+          </select>
+        </div>
+      )}
+      <Actions submitLabel="위임" onClose={onClose} />
+    </form>
+  );
+}
+
 function Actions({ submitLabel, onClose }) {
   return (
     <div className="modal-actions">
@@ -223,6 +254,8 @@ export default function ModalHost({ modal, trip, onClose, onSubmit }) {
     content = <InviteCard trip={trip} onClose={onClose} />;
   } else if (modal.type === "manage-permissions") {
     content = <PermissionsForm trip={trip} onSubmit={handleSubmit} onClose={onClose} />;
+  } else if (modal.type === "transfer-ownership") {
+    content = <TransferOwnershipForm trip={trip} onSubmit={handleSubmit} onClose={onClose} />;
   } else if (modal.type === "view-location") {
     content = <LocationViewer location={modal.location} label={modal.label} onClose={onClose} />;
   } else if (modal.type === "set-nickname" || modal.type === "edit-nickname") {
