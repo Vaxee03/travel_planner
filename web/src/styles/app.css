@@ -63,6 +63,7 @@ input, textarea, select{
   width:100%;
 }
 label{ font-size:14px; color:var(--ink-soft); font-weight:700; display:block; margin-bottom:5px; }
+.itinerary-memo{ min-height:180px; resize:vertical; line-height:1.6; }
 input[type="number"]{ -moz-appearance:textfield; appearance:textfield; }
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }

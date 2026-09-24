@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { fmtDate, mapUrl, splitItems } from "../lib/utils";
+import { saveTrip } from "../lib/tripsApi";
 
 export default function Itinerary({ trip, dayIdx, setDayIdx, openModal, requestDelete, reorderDayItems }) {
   const days = trip.days || [];
@@ -18,37 +19,82 @@ export default function Itinerary({ trip, dayIdx, setDayIdx, openModal, requestD
   }
 
   return (
-    <section>
-      <div className="section-head">
-        <h2>일자별 일정</h2>
-        <span className="btn-row">
-          <button className="btn btn-primary btn-sm" onClick={() => openModal({ type: "add-day" })}>+ 날짜 추가</button>
-        </span>
-      </div>
-
-      {days.length === 0 ? (
-        <div className="empty">아직 일정이 없어요. "날짜 추가"로 첫 날짜를 만들어보세요.</div>
-      ) : (
-        <div className="timeline">
-          {days.map((d, idx) => {
-            const cls = d.status === "confirmed" ? "confirmed" : "open";
-            return (
-              <div className={"day " + cls} key={idx}>
-                <button className="day-summary" onClick={() => setDayIdx(idx)}>
-                  <div className="day-top">
-                    <div className="day-title"><span className="day-date nums">{fmtDate(d.date)}</span></div>
-                    <span className={"status " + cls}>{cls === "confirmed" ? "확정" : "자유일정"}</span>
-                  </div>
-                  <div className="day-summary-body">
-                    <span className={"day-summary-text" + (d.summary ? "" : " muted")}>{d.summary || "세부 계획 미정"}</span>
-                    <span className="day-arrow">자세히 →</span>
-                  </div>
-                </button>
-              </div>
-            );
-          })}
+    <>
+      <section>
+        <div className="section-head">
+          <h2>일자별 일정</h2>
+          <span className="btn-row">
+            <button className="btn btn-primary btn-sm" onClick={() => openModal({ type: "add-day" })}>+ 날짜 추가</button>
+          </span>
         </div>
-      )}
+
+        {days.length === 0 ? (
+          <div className="empty">아직 일정이 없어요. "날짜 추가"로 첫 날짜를 만들어보세요.</div>
+        ) : (
+          <div className="timeline">
+            {days.map((d, idx) => {
+              const cls = d.status === "confirmed" ? "confirmed" : "open";
+              return (
+                <div className={"day " + cls} key={idx}>
+                  <button className="day-summary" onClick={() => setDayIdx(idx)}>
+                    <div className="day-top">
+                      <div className="day-title"><span className="day-date nums">{fmtDate(d.date)}</span></div>
+                      <span className={"status " + cls}>{cls === "confirmed" ? "확정" : "자유일정"}</span>
+                    </div>
+                    <div className="day-summary-body">
+                      <span className={"day-summary-text" + (d.summary ? "" : " muted")}>{d.summary || "세부 계획 미정"}</span>
+                      <span className="day-arrow">자세히 →</span>
+                    </div>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <ItineraryMemo trip={trip} />
+    </>
+  );
+}
+
+/** A free-form scratchpad for the whole trip (packing ideas, things to check,
+ * changes to remember) — shared by every member, autosaved on blur so it
+ * doesn't need its own save button. */
+function ItineraryMemo({ trip }) {
+  const [text, setText] = useState(trip.itineraryMemo || "");
+  const [saving, setSaving] = useState(false);
+  const dirtyRef = useRef(false);
+
+  useEffect(() => {
+    if (!dirtyRef.current) setText(trip.itineraryMemo || "");
+  }, [trip.itineraryMemo]);
+
+  async function handleBlur() {
+    dirtyRef.current = false;
+    if (text === (trip.itineraryMemo || "")) return;
+    setSaving(true);
+    try {
+      await saveTrip({ ...trip, itineraryMemo: text });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section style={{ marginTop: 28 }}>
+      <div className="section-head">
+        <h2>📝 메모</h2>
+        {saving && <span className="section-note">저장 중…</span>}
+      </div>
+      <textarea
+        className="itinerary-memo"
+        rows={9}
+        placeholder="자유롭게 메모를 남겨보세요 (준비물, 아이디어, 변경사항 등)"
+        value={text}
+        onChange={(e) => { dirtyRef.current = true; setText(e.target.value); }}
+        onBlur={handleBlur}
+      />
     </section>
   );
 }
