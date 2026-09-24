@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { fetchRestaurantRecommendations } from "../lib/recommendations";
 import { saveTrip } from "../lib/tripsApi";
+import InfoTooltip from "./InfoTooltip";
 
 export default function Restaurants({ trip }) {
   const [preferences, setPreferences] = useState(trip.restaurantRecs?.preferences || "");
@@ -24,7 +25,18 @@ export default function Restaurants({ trip }) {
   return (
     <section>
       <div className="section-head">
-        <h2>🍜 AI 맛집 추천</h2>
+        <h2 style={{ display: "flex", alignItems: "center" }}>
+          🍜 AI 맛집 추천
+          <InfoTooltip
+            text={
+              "구글 검색으로 지금도 실제 영업 중인지 확인된 곳만 골라 추천해요(지어낸 곳 없음). " +
+              (trip.tripType === "domestic"
+                ? "국내 여행이라 대한민국 국내 매장만 추천 대상이에요. "
+                : "") +
+              "위 입력창에 원하는 조건(가성비, 채식, 아이 동반 등)을 적으면 그 조건에 맞는 곳 위주로 우선 추천해요."
+            }
+          />
+        </h2>
       </div>
 
       {!trip.destination ? (

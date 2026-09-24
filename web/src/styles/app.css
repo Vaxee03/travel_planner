@@ -150,6 +150,23 @@ section{ margin-bottom:44px; }
 }
 .tab-tooltip-wrap:hover .tooltip{ opacity:1; visibility:visible; }
 
+.info-tooltip{ position:relative; display:inline-flex; align-items:center; margin-left:6px; vertical-align:middle; }
+.info-tooltip-icon{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:16px; height:16px; border-radius:50%; background:var(--surface-2);
+  color:var(--ink-soft); font-size:11px; font-weight:700; cursor:help;
+  border:1px solid var(--line); line-height:1;
+}
+.info-tooltip-bubble{
+  position:absolute; bottom:100%; left:50%; transform:translateX(-50%);
+  margin-bottom:8px; width:260px; max-width:min(260px, 70vw);
+  background:var(--ink); color:var(--bg); font-size:13px; font-weight:500;
+  line-height:1.5; padding:10px 12px; border-radius:8px; white-space:normal;
+  z-index:30; opacity:0; visibility:hidden; pointer-events:none;
+  box-shadow:0 8px 24px rgba(0,0,0,.3); text-align:left;
+}
+.info-tooltip:hover .info-tooltip-bubble{ opacity:1; visibility:visible; }
+
 /* ---- Timeline / day cards ---- */
 .timeline{ position:relative; padding-left:32px; }
 .timeline::before{ content:""; position:absolute; left:9px; top:6px; bottom:6px; width:1px; background:var(--line); }
