@@ -261,21 +261,36 @@ function TripForm({ isEdit, t, onSubmit, onClose }) {
   );
 }
 
-/** Destination as search-and-pick instead of free text, backed by the New
- * Places API (same one MapPicker uses) instead of a hardcoded city list —
- * covers any city Google knows about, not just a curated shortlist. Domestic
- * restricts to South Korea; international asks worldwide and drops any hit
- * that comes back located in Korea. Still a plain text input underneath
- * (name="destination") so an unlisted place can just be typed — the dropdown
- * is a shortcut, not a lock. */
+/** Destination as search-and-pick, backed by the New Places API (same one
+ * MapPicker uses) plus a small curated fallback list for countries outside
+ * its 15-country allowlist — between the two, nearly every real destination
+ * is now covered, so free-text entry is intentionally NOT allowed here
+ * anymore: a hand-typed destination could name a place outside what the
+ * selected 여행 유형(국내/해외) actually searches (e.g. typing "오사카" on a
+ * 국내 trip), which broke the map search bias and the restaurant AI's
+ * region restriction. Only an actual pick from the dropdown is accepted;
+ * an unconfirmed typed value snaps back to the last real selection on blur. */
 function DestinationField({ tripType, defaultValue }) {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
   const { isLoaded } = useJsApiLoader({ googleMapsApiKey: apiKey || "", ...MAPS_LOADER_OPTIONS });
   const [query, setQuery] = useState(defaultValue || "");
+  const [selected, setSelected] = useState(defaultValue || "");
   const [suggestions, setSuggestions] = useState([]);
   const [open, setOpen] = useState(false);
   const debounceRef = useRef(null);
   const skipNextFetchRef = useRef(false);
+  const prevTripTypeRef = useRef(tripType);
+
+  // Domestic vs international search completely different regions, so a
+  // destination picked under one no longer makes sense after switching —
+  // clear it rather than silently keeping a now-mismatched value.
+  useEffect(() => {
+    if (prevTripTypeRef.current === tripType) return;
+    prevTripTypeRef.current = tripType;
+    setQuery("");
+    setSelected("");
+    setSuggestions([]);
+  }, [tripType]);
 
   useEffect(() => {
     if (skipNextFetchRef.current) { skipNextFetchRef.current = false; return; }
@@ -312,9 +327,20 @@ function DestinationField({ tripType, defaultValue }) {
     // Keep the country/region alongside the city (not just the bare name) so
     // downstream consumers (map search bias, the restaurant AI prompt) get
     // enough context to disambiguate same-named cities elsewhere in the world.
-    setQuery(s.sub ? `${s.city}, ${s.sub}` : s.city);
+    const value = s.sub ? `${s.city}, ${s.sub}` : s.city;
+    setQuery(value);
+    setSelected(value);
     setSuggestions([]);
     setOpen(false);
+  }
+
+  function handleBlur() {
+    setOpen(false);
+    const trimmed = query.trim();
+    if (!trimmed) { setSelected(""); return; }
+    // Anything left in the box that wasn't actually picked from the list
+    // isn't a valid destination anymore — revert instead of saving free text.
+    if (trimmed !== selected) setQuery(selected);
   }
 
   return (
@@ -322,11 +348,11 @@ function DestinationField({ tripType, defaultValue }) {
       <label>목적지</label>
       <input
         name="destination"
-        placeholder={tripType === "domestic" ? "예: 부산 (검색해서 선택하거나 직접 입력)" : "예: 오사카 (검색해서 선택하거나 직접 입력)"}
+        placeholder={tripType === "domestic" ? "예: 부산 (검색해서 목록에서 선택)" : "예: 오사카 (검색해서 목록에서 선택)"}
         value={query}
         onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
+        onBlur={handleBlur}
         autoComplete="off"
       />
       {open && suggestions.length > 0 && (
