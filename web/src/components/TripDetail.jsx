@@ -32,6 +32,7 @@ export default function TripDetail({ trip, uid, perms, tab, setTab, dayIdx, setD
           <div className="btn-row">
             <button className="btn btn-sm" onClick={() => openModal({ type: "invite" })}>🎟 동행자 초대</button>
             <button className="btn btn-sm" onClick={() => downloadTripIcs(trip)}>📅 캘린더로 내보내기</button>
+            <button className="btn btn-sm" onClick={() => openModal({ type: "duplicate-trip" })}>📋 여행 복제</button>
             {perms.isOwner && (
               <>
                 <button className="btn btn-sm" onClick={() => openModal({ type: "manage-permissions" })}>🔑 권한 관리</button>

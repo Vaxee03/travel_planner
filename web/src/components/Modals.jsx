@@ -220,7 +220,20 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit }
   } else if (modal.type === "add-trip" || modal.type === "edit-trip") {
     const isEdit = modal.type === "edit-trip";
     const t = isEdit ? trip : {};
-    content = <TripForm isEdit={isEdit} t={t} onSubmit={handleSubmit} onClose={onClose} />;
+    content = <TripForm isEdit={isEdit} t={t} trips={trips} onSubmit={handleSubmit} onClose={onClose} />;
+  } else if (modal.type === "duplicate-trip") {
+    content = (
+      <form onSubmit={handleSubmit} noValidate>
+        <h3>여행 복제</h3>
+        <p style={{ margin: "0 0 16px", color: "var(--ink-soft)", fontSize: 13.5 }}>
+          일정·메모·체크리스트를 복사해 내가 방장인 새 여행을 만들어요. 날짜는 새 출발일에 맞춰 옮겨지고, 동행자·예산·예약·후기는 복사되지 않아요.
+        </p>
+        <Field name="title" label="새 여행 이름" required defaultValue={`${trip.title} (복사본)`} />
+        <Field name="startDate" label="새 출발일" type="date" required defaultValue={trip.startDate} />
+        <FormNote message={formError} />
+        <Actions submitLabel="복제" onClose={onClose} />
+      </form>
+    );
   } else if (modal.type === "add-day" || modal.type === "edit-day") {
     const isEdit = modal.type === "edit-day";
     const d = isEdit ? trip.days[modal.idx] : { date: "", status: "open", summary: "" };
@@ -343,7 +356,8 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit }
   );
 }
 
-function TripForm({ isEdit, t, onSubmit, onClose }) {
+function TripForm({ isEdit, t, trips, onSubmit, onClose }) {
+  const checklistSources = (trips || []).filter((tr) => (tr.checklist || []).length > 0);
   const [startDate, setStartDate] = useState(t.startDate || "");
   const [endDate, setEndDate] = useState(t.endDate || "");
   const [tripType, setTripType] = useState(t.tripType || "international");
@@ -400,6 +414,17 @@ function TripForm({ isEdit, t, onSubmit, onClose }) {
         <Field name="travelers" label="인원 수" type="number" placeholder="예: 2" min={1} required defaultValue={t.travelers || 1} />
         <Field name="budgetTotal" label="총 예산 (원)" type="number" placeholder="예: 1000000" defaultValue={t.budgetTotal} />
       </div>
+      {!isEdit && checklistSources.length > 0 && (
+        <div className="field">
+          <label>체크리스트</label>
+          <select name="checklistFrom" defaultValue="">
+            <option value="">기본 준비물 목록으로 시작</option>
+            {checklistSources.map((tr) => (
+              <option key={tr.id} value={tr.id}>“{tr.title}”의 체크리스트 가져오기 ({tr.checklist.length}개)</option>
+            ))}
+          </select>
+        </div>
+      )}
       <FormNote message={error} />
       <Actions submitLabel={isEdit ? "저장" : "여행 만들기"} onClose={onClose} />
     </form>

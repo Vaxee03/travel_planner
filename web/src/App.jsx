@@ -4,7 +4,7 @@ import { firebaseReady, watchAuth, signOutUser } from "./lib/firebase";
 import { subscribeTrips, createTrip, saveTrip, deleteTrip, joinTrip, removeMember, setChecklistDone } from "./lib/tripsApi";
 import { fetchNickname, setNickname } from "./lib/users";
 import { randomNickname } from "./lib/randomNickname";
-import { checklistItemId, ensureChecklistIds, makeChecklistId } from "./lib/utils";
+import { checklistItemId, copyChecklist, daysBetween, ensureChecklistIds, makeChecklistId, shiftDate } from "./lib/utils";
 import { computePerms, PERMISSION_CATEGORIES } from "./lib/permissions";
 import Home from "./components/Home";
 import TripDetail from "./components/TripDetail";
@@ -225,15 +225,39 @@ export default function App() {
       return;
     }
     if (m.type === "add-trip") {
-      const id = await createTrip(user.uid, {
+      const fields = {
         title: values.title, destination: values.destination,
         startDate: values.startDate, endDate: values.endDate,
         travelers: Number(values.travelers) || 1,
         budgetTotal: Number(values.budgetTotal) || 0,
         tripType: values.tripType === "domestic" ? "domestic" : "international",
-      });
+      };
+      const source = values.checklistFrom ? getTrip(trips, values.checklistFrom) : null;
+      if (source) fields.checklist = copyChecklist(source.checklist);
+      const id = await createTrip(user.uid, fields);
       openTrip(id);
       closeModal();
+      return;
+    }
+    if (m.type === "duplicate-trip") {
+      // Copies the plan itself — itinerary (dates moved to the new start),
+      // memo and checklist — but nothing personal to the original group:
+      // no members, budget, bookings, reviews or share link.
+      const offset = trip.startDate ? daysBetween(trip.startDate, values.startDate) : 0;
+      const id = await createTrip(user.uid, {
+        title: values.title,
+        destination: trip.destination,
+        tripType: trip.tripType,
+        travelers: trip.travelers,
+        budgetTotal: trip.budgetTotal,
+        startDate: values.startDate,
+        endDate: shiftDate(trip.endDate, offset),
+        days: structuredClone(trip.days || []).map((d) => ({ ...d, date: shiftDate(d.date, offset) })),
+        itineraryMemo: trip.itineraryMemo || "",
+        checklist: copyChecklist(trip.checklist),
+      });
+      closeModal();
+      openTrip(id);
       return;
     }
     if (m.type === "edit-trip") {

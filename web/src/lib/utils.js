@@ -36,6 +36,24 @@ export function defaultChecklist(tripType) {
   return items.map((text) => ({ id: makeChecklistId(), text }));
 }
 
+/** A checklist carried over into another trip: fresh ids, and no 담당자 —
+ * the other trip's members aren't necessarily the same people. */
+export function copyChecklist(items) {
+  return (items || []).filter((it) => it?.text).map((it) => ({ id: makeChecklistId(), text: it.text }));
+}
+
+/** YYYY-MM-DD date moved by a whole number of days (UTC math, so no DST drift). */
+export function shiftDate(iso, days) {
+  if (!iso) return iso;
+  const d = new Date(iso + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+export function daysBetween(fromIso, toIso) {
+  return Math.round((Date.parse(toIso + "T00:00:00Z") - Date.parse(fromIso + "T00:00:00Z")) / 86400000);
+}
+
 export function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
