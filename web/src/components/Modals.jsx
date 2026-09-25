@@ -7,6 +7,7 @@ import { EXTRA_INTERNATIONAL_DESTINATIONS } from "../lib/extraDestinations";
 import MapPicker from "./MapPicker";
 import InviteCard from "./InviteCard";
 import LocationViewer from "./LocationViewer";
+import RouteMapViewer from "./RouteMapViewer";
 import { useNicknames } from "../lib/useNicknames";
 import { DEFAULT_NICKNAME } from "../lib/users";
 import { PERMISSION_CATEGORIES } from "../lib/permissions";
@@ -298,6 +299,8 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit }
     content = <TransferOwnershipForm trip={trip} onSubmit={handleSubmit} onClose={onClose} />;
   } else if (modal.type === "view-location") {
     content = <LocationViewer location={modal.location} label={modal.label} onClose={onClose} />;
+  } else if (modal.type === "view-route") {
+    content = <RouteMapViewer day={trip.days[modal.dayIdx]} onClose={onClose} />;
   } else if (modal.type === "set-nickname" || modal.type === "edit-nickname") {
     const isEdit = modal.type === "edit-nickname";
     content = (
@@ -330,7 +333,7 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit }
     );
   }
 
-  const isWide = modal.type === "add-item" || modal.type === "edit-item" || modal.type === "invite" || modal.type === "view-location" || modal.type === "manage-permissions";
+  const isWide = modal.type === "add-item" || modal.type === "edit-item" || modal.type === "invite" || modal.type === "view-location" || modal.type === "view-route" || modal.type === "manage-permissions";
   return (
     <div className="modal-overlay">
       <div className={"modal" + (isWide ? " modal-wide" : "")} onClick={(e) => e.stopPropagation()}>

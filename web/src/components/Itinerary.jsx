@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { fmtDate, mapUrl, splitItems } from "../lib/utils";
 import { saveTrip } from "../lib/tripsApi";
+import { routeStops } from "./RouteMapViewer";
 
 export default function Itinerary({ trip, dayIdx, setDayIdx, openModal, requestDelete, reorderDayItems, canEdit }) {
   const days = trip.days || [];
@@ -255,6 +256,11 @@ function DayDetail({ trip, idx, setDayIdx, openModal, requestDelete, reorderDayI
         </div>
       </div>
       <div className="detail-sub">{d.summary || "세부 계획 미정"}</div>
+      {routeStops(d).length > 0 && (
+        <div className="btn-row" style={{ marginBottom: 12 }}>
+          <button className="btn btn-sm" onClick={() => openModal({ type: "view-route", dayIdx: idx })}>🗺 동선 보기</button>
+        </div>
+      )}
 
       {(d.items || []).length === 0 ? (
         <div className="card" style={{ color: "var(--ink-soft)", fontStyle: "italic" }}>아직 등록된 세부 항목이 없어요.</div>
