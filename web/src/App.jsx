@@ -282,10 +282,22 @@ export default function App() {
       closeModal();
       return;
     }
-    if (m.type === "add-budget") {
+    if (m.type === "add-budget" || m.type === "edit-budget") {
       const t = structuredClone(trip);
       t.budgetItems = t.budgetItems || [];
-      t.budgetItems.push({ category: values.category, amount: Number(values.amount) || 0, memo: values.memo, createdBy: user.uid });
+      const prev = m.type === "edit-budget" ? t.budgetItems[m.idx] : { createdBy: user.uid };
+      const item = { ...prev, category: values.category, amount: Number(values.amount) || 0, memo: values.memo };
+      // The split fields only exist on a multi-member trip. The split list is
+      // stored explicitly (not "everyone") so someone who joins later isn't
+      // retroactively charged for costs from before they joined.
+      if ((t.memberIds || []).length > 1) {
+        const split = t.memberIds.filter((id) => values[`split_${id}`] === "on");
+        item.splitAmong = split.length ? split : [...t.memberIds];
+        if (values.paidBy) item.paidBy = values.paidBy;
+        else delete item.paidBy;
+      }
+      if (m.type === "add-budget") t.budgetItems.push(item);
+      else t.budgetItems[m.idx] = item;
       await saveTrip(t);
       closeModal();
       return;
@@ -386,7 +398,7 @@ export default function App() {
 
       {user && <footer className="app-footer">여행 플래너 · {trips.length}개 여행 관리 중</footer>}
 
-      <ModalHost modal={modal} trip={trip} onClose={closeModal} onSubmit={handleModalSubmit} />
+      <ModalHost modal={modal} trip={trip} trips={trips} uid={user?.uid} onClose={closeModal} onSubmit={handleModalSubmit} />
     </div>
   );
 }

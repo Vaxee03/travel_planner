@@ -41,6 +41,43 @@ function AssigneeField({ trip }) {
   );
 }
 
+/** 정산 inputs for a budget item: who paid and who splits it. Hidden on a
+ * solo trip. A new item defaults to "I paid, everyone splits"; an existing
+ * item without a payer (from before 정산 existed) starts on "미지정" so
+ * editing its amount doesn't silently assign it to whoever opened the form. */
+function SplitFields({ trip, item, uid }) {
+  const memberIds = trip?.memberIds || [];
+  const nicknames = useNicknames(memberIds);
+  if (memberIds.length <= 1) return null;
+  const paidBy = item ? item.paidBy || "" : uid;
+  const splitAmong = item?.splitAmong?.length ? item.splitAmong : memberIds;
+  const checkboxLabel = { display: "flex", alignItems: "center", gap: 6, fontWeight: 400, color: "var(--ink)", whiteSpace: "nowrap" };
+  return (
+    <>
+      <div className="field">
+        <label>결제한 사람 (정산용)</label>
+        <select name="paidBy" defaultValue={paidBy}>
+          <option value="">미지정 (정산에서 제외)</option>
+          {memberIds.map((id) => (
+            <option key={id} value={id}>{nicknames[id] || DEFAULT_NICKNAME}</option>
+          ))}
+        </select>
+      </div>
+      <div className="field">
+        <label>나눌 사람</label>
+        <div className="btn-row" style={{ gap: 14 }}>
+          {memberIds.map((id) => (
+            <label key={id} style={checkboxLabel}>
+              <input type="checkbox" name={`split_${id}`} defaultChecked={splitAmong.includes(id)} style={{ width: "auto", flexShrink: 0 }} />
+              {nicknames[id] || DEFAULT_NICKNAME}
+            </label>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
 /** 방장 only — lets them grant individual permission categories to each
  * other member. Checkbox names are perm_<uid>_<category>; App.jsx's
  * handleModalSubmit reconstructs the memberPermissions map from whichever
@@ -143,7 +180,7 @@ function FormNote({ message }) {
 
 /** Renders the overlay + the right form for `modal.type`. Submits call
  * onSubmit(modal.type, values) so App.jsx can own all the write logic. */
-export default function ModalHost({ modal, trip, onClose, onSubmit }) {
+export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit }) {
   const [formError, setFormError] = useState(null);
   useEffect(() => { setFormError(null); }, [modal]);
 
@@ -206,15 +243,18 @@ export default function ModalHost({ modal, trip, onClose, onSubmit }) {
     const isEdit = modal.type === "edit-item";
     const it = isEdit ? trip.days[modal.dayIdx].items[modal.idx] : { time: "", text: "" };
     content = <ItemForm isEdit={isEdit} it={it} destination={trip.destination} onSubmit={handleSubmit} onClose={onClose} />;
-  } else if (modal.type === "add-budget") {
+  } else if (modal.type === "add-budget" || modal.type === "edit-budget") {
+    const isEdit = modal.type === "edit-budget";
+    const b = isEdit ? trip.budgetItems[modal.idx] : { category: "", amount: "", memo: "" };
     content = (
       <form onSubmit={handleSubmit} noValidate>
-        <h3>지출 항목 추가</h3>
-        <Field name="category" label="카테고리" placeholder="예: 숙박 / 교통 / 식비 / 쇼핑" required />
-        <Field name="amount" label="금액 (원)" type="number" placeholder="예: 150000" required />
-        <Field name="memo" label="메모" placeholder="선택" />
+        <h3>{isEdit ? "지출 항목 수정" : "지출 항목 추가"}</h3>
+        <Field name="category" label="카테고리" placeholder="예: 숙박 / 교통 / 식비 / 쇼핑" required defaultValue={b.category} />
+        <Field name="amount" label="금액 (원)" type="number" placeholder="예: 150000" required defaultValue={b.amount} />
+        <Field name="memo" label="메모" placeholder="선택" defaultValue={b.memo} />
+        <SplitFields trip={trip} item={isEdit ? b : null} uid={uid} />
         <FormNote message={formError} />
-        <Actions submitLabel="추가" onClose={onClose} />
+        <Actions submitLabel={isEdit ? "저장" : "추가"} onClose={onClose} />
       </form>
     );
   } else if (modal.type === "add-check") {
