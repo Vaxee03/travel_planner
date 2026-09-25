@@ -152,6 +152,50 @@ function TransferOwnershipForm({ trip, onSubmit, onClose }) {
   );
 }
 
+/** 방장 only — turns the read-only public itinerary link on/off. */
+function ShareLinkForm({ trip, onSubmit, onClose }) {
+  const [copied, setCopied] = useState(false);
+  const url = trip.publicShareId ? `${window.location.origin}/share/${trip.publicShareId}` : "";
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <div>
+      <h3>🔗 공개 링크</h3>
+      <p style={{ margin: "0 0 16px", color: "var(--ink-soft)", fontSize: 13.5 }}>
+        링크를 가진 사람은 로그인 없이 <b>일정만</b> 볼 수 있어요(수정 불가). 예산·예약번호·체크리스트·동행자 정보는 공개되지 않아요.
+      </p>
+      {url ? (
+        <>
+          <div className="field">
+            <label>공유 링크</label>
+            <input readOnly value={url} onFocus={(e) => e.target.select()} />
+          </div>
+          <div className="modal-actions" style={{ justifyContent: "space-between" }}>
+            <button type="button" className="btn btn-danger" onClick={() => onSubmit({ type: "share-link" }, { action: "off" })}>링크 끄기</button>
+            <span className="btn-row">
+              <button type="button" className="btn" onClick={onClose}>닫기</button>
+              <button type="button" className="btn btn-primary" onClick={copy}>{copied ? "복사됨 ✓" : "링크 복사"}</button>
+            </span>
+          </div>
+        </>
+      ) : (
+        <div className="modal-actions">
+          <button type="button" className="btn" onClick={onClose}>닫기</button>
+          <button type="button" className="btn btn-primary" onClick={() => onSubmit({ type: "share-link" }, { action: "on" })}>공개 링크 만들기</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Actions({ submitLabel, onClose }) {
   return (
     <div className="modal-actions">
@@ -312,6 +356,8 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit }
     content = <TransferOwnershipForm trip={trip} onSubmit={handleSubmit} onClose={onClose} />;
   } else if (modal.type === "view-location") {
     content = <LocationViewer location={modal.location} label={modal.label} onClose={onClose} />;
+  } else if (modal.type === "share-link") {
+    content = <ShareLinkForm trip={trip} onSubmit={onSubmit} onClose={onClose} />;
   } else if (modal.type === "view-route") {
     content = <RouteMapViewer day={trip.days[modal.dayIdx]} onClose={onClose} />;
   } else if (modal.type === "set-nickname" || modal.type === "edit-nickname") {

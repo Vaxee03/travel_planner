@@ -71,6 +71,17 @@ export function setChecklistDone(tripId, itemId, done) {
   return updateDoc(doc(db, "trips", tripId), { [`checklistDone.${itemId}`]: done });
 }
 
+/** Live read-only itinerary behind a public share link (no sign-in needed).
+ * Calls onChange(null) while the copy doesn't exist — the link was turned
+ * off, or it was just turned on and the sync function hasn't written it yet. */
+export function subscribePublicTrip(shareId, onChange, onError) {
+  return onSnapshot(
+    doc(db, "publicTrips", shareId),
+    (snap) => onChange(snap.exists() ? snap.data() : null),
+    onError
+  );
+}
+
 export async function uploadReviewPhoto(tripId, file) {
   const path = `trips/${tripId}/review/${Date.now()}_${file.name}`;
   const storageRef = ref(storage, path);

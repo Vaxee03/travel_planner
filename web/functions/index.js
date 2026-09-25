@@ -1,5 +1,56 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onDocumentWritten } = require("firebase-functions/v2/firestore");
+const { initializeApp } = require("firebase-admin/app");
+const { getFirestore } = require("firebase-admin/firestore");
 const { GoogleGenAI } = require("@google/genai");
+
+initializeApp();
+
+// The app's named Firestore database (firebase.json → firestore.database),
+// which lives in Seoul — Firestore triggers must run in the same region.
+const DATABASE_ID = "travelplanner";
+const DATABASE_REGION = "asia-northeast3";
+const db = getFirestore(DATABASE_ID);
+
+/** What a public share link exposes: the itinerary only. Budget, bookings
+ * (confirmation numbers!), checklist, memo, reviews and member ids are
+ * deliberately left out. */
+function publicTripCopy(trip) {
+  return {
+    title: trip.title || "",
+    destination: trip.destination || "",
+    tripType: trip.tripType || "international",
+    startDate: trip.startDate || "",
+    endDate: trip.endDate || "",
+    days: (trip.days || []).map((d) => ({
+      date: d.date || "",
+      status: d.status || "open",
+      summary: d.summary || "",
+      items: (d.items || []).map((it) => {
+        const item = { time: it.time || "", text: it.text || "" };
+        if (it.kind) item.kind = it.kind;
+        if (it.location) item.location = it.location;
+        return item;
+      }),
+    })),
+    updatedAt: Date.now(),
+  };
+}
+
+// Keeps publicTrips/{publicShareId} in step with the trip: rewritten on
+// every trip change while the link is on, removed when the 방장 turns the
+// link off (or regenerates it) and when the trip itself is deleted.
+exports.syncPublicTrip = onDocumentWritten(
+  { document: "trips/{tripId}", database: DATABASE_ID, region: DATABASE_REGION },
+  async (event) => {
+    const before = event.data?.before?.data();
+    const after = event.data?.after?.data();
+    const oldId = before?.publicShareId;
+    const newId = after?.publicShareId;
+    if (oldId && oldId !== newId) await db.doc(`publicTrips/${oldId}`).delete();
+    if (newId) await db.doc(`publicTrips/${newId}`).set(publicTripCopy(after));
+  }
+);
 
 const MODEL = "gemini-3.6-flash";
 

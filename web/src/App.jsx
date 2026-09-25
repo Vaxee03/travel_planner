@@ -10,6 +10,7 @@ import Home from "./components/Home";
 import TripDetail from "./components/TripDetail";
 import ModalHost from "./components/Modals";
 import AuthGate from "./components/AuthGate";
+import PublicTripView from "./components/PublicTripView";
 
 const TAB_KEYS = ["itinerary", "budget", "checklist", "bookings", "restaurants", "review"];
 
@@ -30,6 +31,7 @@ export default function App() {
   const navigate = useNavigate();
   const tripMatch = matchPath("/trip/:tripId/:tab?", location.pathname);
   const joinMatch = matchPath("/join/:tripId", location.pathname);
+  const shareMatch = matchPath("/share/:shareId", location.pathname);
   const tripId = tripMatch?.params.tripId || null;
   const tab = TAB_KEYS.includes(tripMatch?.params.tab) ? tripMatch.params.tab : "itinerary";
   const [dayIdx, setDayIdx] = useState(null);
@@ -64,7 +66,7 @@ export default function App() {
   }, [user, navigate]);
 
   // Any other path (typo, old bookmark) just falls back to the trip list.
-  const knownPath = Boolean(location.pathname === "/" || tripMatch || joinMatch);
+  const knownPath = Boolean(location.pathname === "/" || tripMatch || joinMatch || shareMatch);
   useEffect(() => {
     if (!knownPath) navigate("/", { replace: true });
   }, [knownPath, navigate]);
@@ -212,6 +214,15 @@ export default function App() {
       t.memberPermissions = next;
       await saveTrip(t);
       closeModal();
+      return;
+    }
+    if (m.type === "share-link") {
+      // Only flips publicShareId; the syncPublicTrip function writes/removes
+      // the public copy. The modal stays open so the new link shows up.
+      const t = structuredClone(trip);
+      if (values.action === "on") t.publicShareId = crypto.randomUUID().replace(/-/g, "");
+      else delete t.publicShareId;
+      await saveTrip(t);
       return;
     }
     if (m.type === "transfer-ownership") {
@@ -382,7 +393,9 @@ export default function App() {
         </div>
       </header>
 
-      {authError ? (
+      {shareMatch ? (
+        <PublicTripView shareId={shareMatch.params.shareId} />
+      ) : authError ? (
         <div className="empty">{authError}</div>
       ) : !authResolved ? (
         <div className="empty">불러오는 중이에요…</div>
