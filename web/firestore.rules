@@ -20,8 +20,26 @@ service cloud.firestore {
           request.auth.uid in request.resource.data.memberIds &&
           request.resource.data.memberIds.size() == resource.data.memberIds.size() + 1
         ) ||
+        isLeavingSelf() ||
         (request.auth.uid in resource.data.memberIds && isAllowedTripUpdate())
       );
+
+      // A non-방장 member may leave on their own: remove exactly their own uid
+      // from memberIds (plus their own memberPermissions entry) and nothing
+      // else. The 방장 has to hand the trip over (방장 위임) before leaving.
+      function isLeavingSelf() {
+        let changed = request.resource.data.diff(resource.data).affectedKeys();
+        return
+          request.auth.uid in resource.data.memberIds &&
+          request.auth.uid != resource.data.ownerId &&
+          changed.hasOnly(['memberIds', 'memberPermissions']) &&
+          !(request.auth.uid in request.resource.data.memberIds) &&
+          resource.data.memberIds.hasAll(request.resource.data.memberIds) &&
+          request.resource.data.memberIds.size() == resource.data.memberIds.size() - 1 &&
+          request.resource.data.get('memberPermissions', {})
+            .diff(resource.data.get('memberPermissions', {}))
+            .affectedKeys().hasOnly([request.auth.uid]);
+      }
 
       function isOwner() {
         return request.auth.uid == resource.data.ownerId;
@@ -47,12 +65,24 @@ service cloud.firestore {
       function isAllowedTripUpdate() {
         let changed = request.resource.data.diff(resource.data).affectedKeys();
         return
-          (!changed.hasAny(['title', 'destination', 'startDate', 'endDate', 'travelers', 'budgetTotal', 'tripType', 'ownerId', 'memberPermissions', 'memberIds']) || isOwner()) &&
+          (!changed.hasAny(['title', 'destination', 'startDate', 'endDate', 'travelers', 'budgetTotal', 'tripType', 'ownerId', 'memberPermissions', 'memberIds', 'publicShareId']) || isOwner()) &&
+          // The 방장 always stays a member — they can't drop themselves from
+          // memberIds (orphaning the trip) or hand ownerId to a non-member.
+          (!changed.hasAny(['memberIds', 'ownerId']) || request.resource.data.ownerId in request.resource.data.memberIds) &&
           (!changed.hasAny(['days', 'itineraryMemo']) || hasPerm('itinerary')) &&
           (!changed.hasAny(['budgetItems']) || hasPerm('budget')) &&
           (!changed.hasAny(['checklist']) || hasPerm('checklist')) &&
           (!changed.hasAny(['bookings']) || hasPerm('bookings'));
       }
+    }
+
+    // Read-only itinerary copies behind a trip's public share link. Written
+    // only by the syncPublicTrip Cloud Function (Admin SDK bypasses rules),
+    // which copies just the itinerary — never bookings, budget or members.
+    // The doc id is an unguessable random string, so reads are open.
+    match /publicTrips/{shareId} {
+      allow read: if true;
+      allow write: if false;
     }
 
     // Account-level nickname. Readable by any signed-in user (needed to show

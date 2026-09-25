@@ -1,9 +1,9 @@
 import { initializeApp } from "firebase/app";
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
-import { getFunctions } from "firebase/functions";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, connectFirestoreEmulator } from "firebase/firestore";
+import { getStorage, connectStorageEmulator } from "firebase/storage";
+import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 import {
-  getAuth, onAuthStateChanged, signInWithEmailAndPassword,
+  getAuth, onAuthStateChanged, connectAuthEmulator, signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut, GoogleAuthProvider, OAuthProvider, signInWithPopup,
 } from "firebase/auth";
@@ -39,6 +39,14 @@ if (firebaseReady) {
   storage = getStorage(app);
   auth = getAuth(app);
   functions = getFunctions(app, "us-central1");
+  // Local-only: `VITE_USE_EMULATORS=1 npm run dev` points everything at the
+  // Firebase emulators (firebase emulators:start) instead of production.
+  if (import.meta.env.VITE_USE_EMULATORS === "1") {
+    connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+    connectFirestoreEmulator(db, "127.0.0.1", 8080);
+    connectStorageEmulator(storage, "127.0.0.1", 9199);
+    connectFunctionsEmulator(functions, "127.0.0.1", 5001);
+  }
 } else {
   console.warn(
     "[firebase] 설정값이 없어 Firebase를 초기화하지 않았어요. web/.env.local에 VITE_FIREBASE_* 값을 채워주세요."

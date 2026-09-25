@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { matchPath, useLocation, useNavigate } from "react-router-dom";
 import { firebaseReady, watchAuth, signOutUser } from "./lib/firebase";
-import { subscribeTrips, createTrip, saveTrip, deleteTrip, joinTrip, setChecklistDone } from "./lib/tripsApi";
+import { subscribeTrips, createTrip, saveTrip, deleteTrip, joinTrip, removeMember, setChecklistDone } from "./lib/tripsApi";
 import { fetchNickname, setNickname } from "./lib/users";
 import { randomNickname } from "./lib/randomNickname";
 import { checklistItemId, ensureChecklistIds, makeChecklistId } from "./lib/utils";
@@ -154,6 +154,11 @@ export default function App() {
     if (m.type === "confirm") {
       if (m.onYes === "delete-trip") {
         await deleteTrip(tripId);
+        navigate("/", { replace: true });
+      } else if (m.onYes === "remove-member") {
+        await removeMember(tripId, m.uid);
+      } else if (m.onYes === "leave-trip") {
+        await removeMember(tripId, user.uid);
         navigate("/", { replace: true });
       } else if (m.onYes === "delete-day") {
         const t = structuredClone(trip);

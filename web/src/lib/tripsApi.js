@@ -4,7 +4,7 @@
 
 import {
   collection, doc, onSnapshot, setDoc, addDoc, deleteDoc, updateDoc,
-  arrayUnion, serverTimestamp, query, where,
+  arrayUnion, arrayRemove, deleteField, serverTimestamp, query, where,
 } from "firebase/firestore";
 import {
   ref, uploadBytes, getDownloadURL, deleteObject,
@@ -50,6 +50,16 @@ export function deleteTrip(tripId) {
 
 export function joinTrip(tripId, uid) {
   return updateDoc(doc(db, "trips", tripId), { memberIds: arrayUnion(uid) });
+}
+
+/** Drops a member from a trip along with any permissions they'd been
+ * granted. Used both for leaving on your own (non-방장 only, see the
+ * isLeavingSelf rule) and for the 방장 removing someone else. */
+export function removeMember(tripId, uid) {
+  return updateDoc(doc(db, "trips", tripId), {
+    memberIds: arrayRemove(uid),
+    [`memberPermissions.${uid}`]: deleteField(),
+  });
 }
 
 /** A targeted field update (not the usual read-whole-trip/mutate/saveTrip

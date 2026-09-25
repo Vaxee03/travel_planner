@@ -54,13 +54,34 @@ export default function TripDetail({ trip, uid, perms, tab, setTab, dayIdx, setD
         </div>
         {memberIds.length > 0 && (
           <div className="section-note" style={{ marginTop: -11 }}>
-            동행자: {memberIds.map((uid, i) => (
-              <span key={uid}>
+            동행자: {memberIds.map((memberId, i) => (
+              <span key={memberId}>
                 {i > 0 ? ", " : ""}
-                {nicknames[uid] || DEFAULT_NICKNAME}
-                {uid === trip.ownerId ? " 👑 방장" : ""}
+                {nicknames[memberId] || DEFAULT_NICKNAME}
+                {memberId === trip.ownerId ? " 👑 방장" : ""}
+                {perms.isOwner && memberId !== trip.ownerId && (
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    title="내보내기"
+                    style={{ padding: "0 4px", fontSize: 12, color: "var(--danger)" }}
+                    onClick={() => requestDelete("remove-member", `${nicknames[memberId] || DEFAULT_NICKNAME}님을 이 여행에서 내보낼까요?`, { uid: memberId, confirmLabel: "내보내기" })}
+                  >
+                    ✕
+                  </button>
+                )}
               </span>
             ))}
+            {!perms.isOwner && (
+              <button
+                type="button"
+                className="btn-ghost btn-sm btn-danger"
+                style={{ marginLeft: 10 }}
+                onClick={() => requestDelete("leave-trip", "이 여행에서 나갈까요? 다시 참여하려면 초대 링크가 필요해요.", { confirmLabel: "나가기" })}
+              >
+                여행 나가기
+              </button>
+            )}
           </div>
         )}
       </div>

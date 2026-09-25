@@ -174,7 +174,7 @@ export default function ModalHost({ modal, trip, onClose, onSubmit }) {
             style={{ background: "var(--danger)", borderColor: "var(--danger)" }}
             onClick={() => onSubmit(modal, {})}
           >
-            삭제
+            {modal.confirmLabel || "삭제"}
           </button>
         </div>
       </>
