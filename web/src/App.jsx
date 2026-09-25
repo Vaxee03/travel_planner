@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { matchPath, useLocation, useNavigate } from "react-router-dom";
 import { firebaseReady, watchAuth, signOutUser } from "./lib/firebase";
 import { subscribeTrips, createTrip, saveTrip, deleteTrip, joinTrip, setChecklistDone } from "./lib/tripsApi";
 import { fetchNickname, setNickname } from "./lib/users";
@@ -9,6 +10,8 @@ import Home from "./components/Home";
 import TripDetail from "./components/TripDetail";
 import ModalHost from "./components/Modals";
 import AuthGate from "./components/AuthGate";
+
+const TAB_KEYS = ["itinerary", "budget", "checklist", "bookings", "restaurants", "review"];
 
 function getTrip(trips, id) {
   return trips.find((t) => t.id === id) || null;
@@ -21,9 +24,14 @@ export default function App() {
   const [trips, setTrips] = useState([]);
   const [tripsReady, setTripsReady] = useState(false);
 
-  const [screen, setScreen] = useState("home");
-  const [tripId, setTripId] = useState(null);
-  const [tab, setTab] = useState("itinerary");
+  // Which screen/trip/tab is showing lives in the URL (/, /trip/:tripId/:tab,
+  // /join/:tripId) so a refresh or a shared link lands on the same view.
+  const location = useLocation();
+  const navigate = useNavigate();
+  const tripMatch = matchPath("/trip/:tripId/:tab?", location.pathname);
+  const joinMatch = matchPath("/join/:tripId", location.pathname);
+  const tripId = tripMatch?.params.tripId || null;
+  const tab = TAB_KEYS.includes(tripMatch?.params.tab) ? tripMatch.params.tab : "itinerary";
   const [dayIdx, setDayIdx] = useState(null);
   const [modal, setModal] = useState(null);
   const [nickname, setNicknameState] = useState("");
@@ -37,27 +45,43 @@ export default function App() {
       // this was removed) gets signed straight back out instead of silently
       // continuing as a ghost guest.
       if (u?.isAnonymous) { signOutUser(); return; }
-      // A different account (or a sign-out) can't still be looking at the
-      // previous account's trip screen, so drop back to the trip list.
-      setUser((prev) => {
-        if (prev?.uid !== u?.uid) { setScreen("home"); setTripId(null); }
-        return u;
-      });
+      setUser(u);
       setAuthResolved(true);
     });
     return unsub;
   }, []);
 
-  // Consume a pending ?join=<tripId> link from the URL exactly once.
+  // A different account (or a sign-out) can't still be looking at the
+  // previous account's trip screen, so drop back to the trip list. The first
+  // sign-in of a page load (null → user) is left alone so a refreshed or
+  // shared /trip/... or /join/... URL still opens where it points.
+  const prevUidRef = useRef(null);
   useEffect(() => {
-    if (!user) return;
-    const params = new URLSearchParams(window.location.search);
-    const joinId = params.get("join");
-    if (!joinId) return;
+    const uid = user?.uid || null;
+    const prev = prevUidRef.current;
+    prevUidRef.current = uid;
+    if (prev && prev !== uid) navigate("/", { replace: true });
+  }, [user, navigate]);
+
+  // Any other path (typo, old bookmark) just falls back to the trip list.
+  const knownPath = Boolean(location.pathname === "/" || tripMatch || joinMatch);
+  useEffect(() => {
+    if (!knownPath) navigate("/", { replace: true });
+  }, [knownPath, navigate]);
+
+  // The day picked inside the itinerary tab isn't part of the URL, so it
+  // resets whenever a different trip is opened.
+  useEffect(() => { setDayIdx(null); }, [tripId]);
+
+  // Consume an invite link — /join/<tripId>, or the older ?join=<tripId> form
+  // that already-shared invite cards still point at — then open that trip.
+  const joinId = joinMatch?.params.tripId || new URLSearchParams(location.search).get("join");
+  useEffect(() => {
+    if (!user || !joinId) return;
     joinTrip(joinId, user.uid)
-      .catch(() => {})
-      .then(() => window.history.replaceState(null, "", window.location.pathname));
-  }, [user]);
+      .then(() => navigate(`/trip/${joinId}/itinerary`, { replace: true }))
+      .catch(() => navigate("/", { replace: true }));
+  }, [user, joinId, navigate]);
 
   // If a nickname hasn't been set yet (brand-new signup or a pre-existing
   // account from before this feature), prompt once per login — skippable,
@@ -89,10 +113,13 @@ export default function App() {
   const trip = tripId ? getTrip(trips, tripId) : null;
 
   function openTrip(id) {
-    setScreen("trip"); setTripId(id); setTab("itinerary"); setDayIdx(null);
+    navigate(`/trip/${id}/itinerary`);
   }
   function goHome() {
-    setScreen("home"); setTripId(null); setDayIdx(null); setTab("itinerary");
+    navigate("/");
+  }
+  function setTab(key) {
+    navigate(`/trip/${tripId}/${key}`);
   }
   function openModal(m) { setModal(m); }
   function closeModal() { setModal(null); }
@@ -127,7 +154,7 @@ export default function App() {
     if (m.type === "confirm") {
       if (m.onYes === "delete-trip") {
         await deleteTrip(tripId);
-        goHome();
+        navigate("/", { replace: true });
       } else if (m.onYes === "delete-day") {
         const t = structuredClone(trip);
         t.days.splice(m.idx, 1);
@@ -322,7 +349,9 @@ export default function App() {
         <AuthGate onAuthed={setUser} />
       ) : !tripsReady ? (
         <div className="empty">저장 기능을 불러오는 중이에요…</div>
-      ) : screen === "home" ? (
+      ) : joinId ? (
+        <div className="empty">초대받은 여행에 참여하는 중이에요…</div>
+      ) : !tripId ? (
         <Home trips={trips} onOpenTrip={openTrip} onAddTrip={() => openModal({ type: "add-trip" })} onJoinByCode={handleJoinByCode} />
       ) : trip ? (
         <TripDetail
@@ -342,7 +371,12 @@ export default function App() {
           onDeleteTrip={() => requestDelete("delete-trip", "이 여행을 삭제할까요? 되돌릴 수 없어요.")}
         />
       ) : (
-        <div className="empty">여행을 찾을 수 없어요.</div>
+        <div className="empty">
+          여행을 찾을 수 없어요. 삭제됐거나 참여하지 않은 여행이에요.
+          <div style={{ marginTop: 12 }}>
+            <button className="btn" onClick={() => navigate("/", { replace: true })}>여행 목록으로</button>
+          </div>
+        </div>
       )}
 
       {user && <footer className="app-footer">여행 플래너 · {trips.length}개 여행 관리 중</footer>}

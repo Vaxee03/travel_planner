@@ -6,7 +6,7 @@ const PAD = 40;
 const FONT = '"Jua", "Noto Sans KR", sans-serif';
 
 export function inviteJoinUrl(tripId) {
-  return `${window.location.origin}${window.location.pathname}?join=${tripId}`;
+  return `${window.location.origin}/join/${tripId}`;
 }
 
 function roundedClip(ctx, x, y, w, h, r) {
