@@ -477,6 +477,11 @@ function TripForm({ isEdit, t, trips, onSubmit, onClose }) {
   const [error, setError] = useState(null);
 
   function handleSubmit(e) {
+    if (e.target.querySelector("input[name=destination][data-unconfirmed]")) {
+      e.preventDefault();
+      setError("목적지는 검색한 뒤 목록에서 선택해주세요.");
+      return;
+    }
     if (startDate && endDate && endDate < startDate) {
       e.preventDefault();
       setError("종료일은 시작일보다 빠를 수 없어요.");
@@ -559,11 +564,20 @@ function DestinationField({ tripType, defaultValue }) {
   const [query, setQuery] = useState(defaultValue || "");
   const [selected, setSelected] = useState(defaultValue || "");
   const [suggestions, setSuggestions] = useState([]);
+  // The (trimmed) query the current `suggestions` were fetched for — lets
+  // Enter tell a list that matches what's typed from one still showing
+  // results for an earlier, shorter query.
+  const [suggestionsFor, setSuggestionsFor] = useState("");
   const [open, setOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1); // keyboard-highlighted suggestion
+  const [noMatch, setNoMatch] = useState(false);
   const [listPos, setListPos] = useState(null);
   const inputRef = useRef(null);
   const debounceRef = useRef(null);
+  const fetchSeqRef = useRef(0);
+  // Query the user pressed Enter on before its results arrived; the first
+  // result for exactly that query gets picked as soon as it lands.
+  const pendingEnterRef = useRef(null);
   const skipNextFetchRef = useRef(false);
   const prevTripTypeRef = useRef(tripType);
 
@@ -602,6 +616,7 @@ function DestinationField({ tripType, defaultValue }) {
     setQuery("");
     setSelected("");
     setSuggestions([]);
+    setSuggestionsFor("");
   }, [tripType]);
 
   useEffect(() => {
@@ -609,9 +624,10 @@ function DestinationField({ tripType, defaultValue }) {
     if (!isLoaded) return;
     clearTimeout(debounceRef.current);
     const q = query.trim();
-    if (!q) { setSuggestions([]); return; }
+    if (!q) { setSuggestions([]); setSuggestionsFor(""); return; }
 
     debounceRef.current = setTimeout(async () => {
+      const seq = ++fetchSeqRef.current;
       let apiResults = [];
       try {
         const regionCodes = tripType === "domestic" ? ["kr"] : INTERNATIONAL_REGION_CODES;
@@ -619,17 +635,25 @@ function DestinationField({ tripType, defaultValue }) {
       } catch {
         apiResults = [];
       }
-      if (tripType === "domestic") {
-        setSuggestions(apiResults);
-        return;
+      // A slower response for an older query must not overwrite newer results.
+      if (seq !== fetchSeqRef.current) return;
+      let results = apiResults;
+      if (tripType !== "domestic") {
+        const seen = new Set(apiResults.map((r) => `${r.city}|${r.sub}`));
+        const extraResults = EXTRA_INTERNATIONAL_DESTINATIONS.flatMap((g) =>
+          g.cities
+            .filter((city) => city.includes(q) && !seen.has(`${city}|${g.country}`))
+            .map((city) => ({ city, sub: g.country }))
+        );
+        results = [...apiResults, ...extraResults];
       }
-      const seen = new Set(apiResults.map((r) => `${r.city}|${r.sub}`));
-      const extraResults = EXTRA_INTERNATIONAL_DESTINATIONS.flatMap((g) =>
-        g.cities
-          .filter((city) => city.includes(q) && !seen.has(`${city}|${g.country}`))
-          .map((city) => ({ city, sub: g.country }))
-      );
-      setSuggestions([...apiResults, ...extraResults]);
+      if (pendingEnterRef.current === q) {
+        pendingEnterRef.current = null;
+        if (results.length) { pick(results[0]); return; }
+        setNoMatch(true);
+      }
+      setSuggestions(results);
+      setSuggestionsFor(q);
     }, 200);
     return () => clearTimeout(debounceRef.current);
   }, [query, isLoaded, tripType]);
@@ -643,14 +667,21 @@ function DestinationField({ tripType, defaultValue }) {
     setQuery(value);
     setSelected(value);
     setSuggestions([]);
+    setSuggestionsFor("");
+    setNoMatch(false);
     setOpen(false);
   }
 
-  // ↑/↓ move the highlight, Enter picks it (or the first result if nothing
-  // is highlighted yet), Esc closes the list. Enter never submits the whole
-  // trip form while the list is showing. Enter pressed mid-composition (a
-  // Korean syllable not yet committed) is ignored, since the results on
-  // screen don't reflect that last syllable yet.
+  // ↑/↓ move the highlight, Esc closes the list. Enter only ever submits the
+  // trip form when the box holds a destination actually picked from the list;
+  // otherwise it picks instead:
+  //   - an item highlighted with the arrow keys → that item
+  //   - results already in for exactly what's typed → the first one
+  //   - results still loading (or showing an older query's) → waits, and
+  //     picks the first result for this query when it arrives
+  //   - no results → shows a hint, stays put
+  // Enter pressed mid-composition (a Korean syllable not yet committed) is
+  // swallowed, since what's on screen doesn't reflect that syllable yet.
   function handleKeyDown(e) {
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       if (!suggestions.length) return;
@@ -659,10 +690,18 @@ function DestinationField({ tripType, defaultValue }) {
       const n = suggestions.length;
       setActiveIdx((i) => (e.key === "ArrowDown" ? (i + 1) % n : i <= 0 ? n - 1 : i - 1));
     } else if (e.key === "Enter") {
-      if (!listShown) return;
+      const q = query.trim();
+      if (q === selected) return; // a real pick (or empty) — let the form submit
       e.preventDefault();
       if (e.nativeEvent.isComposing) return;
-      pick(suggestions[activeIdx >= 0 ? activeIdx : 0]);
+      if (!q) { setSelected(""); return; }
+      if (listShown && activeIdx >= 0) { pick(suggestions[activeIdx]); return; }
+      if (suggestionsFor === q) {
+        if (suggestions.length) pick(suggestions[0]);
+        else setNoMatch(true);
+        return;
+      }
+      pendingEnterRef.current = q;
     } else if (e.key === "Escape" && listShown) {
       e.preventDefault();
       e.stopPropagation();
@@ -687,7 +726,7 @@ function DestinationField({ tripType, defaultValue }) {
         name="destination"
         placeholder={tripType === "domestic" ? "예: 부산 (검색해서 목록에서 선택)" : "예: 오사카 (검색해서 목록에서 선택)"}
         value={query}
-        onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+        onChange={(e) => { setQuery(e.target.value); setOpen(true); setNoMatch(false); pendingEnterRef.current = null; }}
         onFocus={() => setOpen(true)}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
@@ -695,7 +734,16 @@ function DestinationField({ tripType, defaultValue }) {
         role="combobox"
         aria-expanded={listShown}
         aria-activedescendant={activeIdx >= 0 ? `dest-opt-${activeIdx}` : undefined}
+        // Read by TripForm's submit check: set while the box holds text that
+        // wasn't picked from the list (covers mobile "go" keys that don't
+        // send a normal Enter keydown).
+        data-unconfirmed={query.trim() && query.trim() !== selected ? "1" : undefined}
       />
+      {noMatch && (
+        <div className="section-note" style={{ marginTop: 6, color: "var(--danger)" }}>
+          검색 결과가 없어요. 다른 이름으로 검색해보세요.
+        </div>
+      )}
       {listShown && listPos && createPortal(
         <div
           role="listbox"
