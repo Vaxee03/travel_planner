@@ -72,6 +72,22 @@ export function setChecklistDone(tripId, itemId, done) {
   return updateDoc(doc(db, "trips", tripId), { [`checklistDone.${itemId}`]: done });
 }
 
+/** Turns the public share link on (a new random id) or off. A targeted
+ * one-field update rather than the usual clone-and-saveTrip, so a stale or
+ * odd local copy of the rest of the trip can't make it fail. Resolves the
+ * new id (or null when turned off). */
+export async function setPublicShareId(tripId, on) {
+  const shareId = on ? randomShareId() : null;
+  await updateDoc(doc(db, "trips", tripId), { publicShareId: on ? shareId : deleteField() });
+  return shareId;
+}
+
+function randomShareId() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 /** Read-only itinerary behind a public share link (no sign-in needed),
  * served by the getPublicTrip function. Resolves null when the link was
  * turned off or never existed. */

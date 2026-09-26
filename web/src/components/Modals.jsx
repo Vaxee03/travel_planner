@@ -223,7 +223,7 @@ function ShareLinkForm({ trip, onSubmit, onClose }) {
       const why =
         err?.code === "permission-denied" ? "방장만 공개 링크를 바꿀 수 있어요. 새로고침 후 다시 시도해주세요."
         : err?.code === "unavailable" || !navigator.onLine ? "서버에 연결하지 못했어요. 인터넷 연결이나 광고 차단 확장 프로그램을 확인해주세요."
-        : `잠시 후 다시 시도해주세요.${err?.code ? ` (${err.code})` : ""}`;
+        : `잠시 후 다시 시도해주세요. (${err?.code || err?.name || "unknown"})`;
       setError(`${what}. ${why}`);
     } finally {
       setBusy(false);

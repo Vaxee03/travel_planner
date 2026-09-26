@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, matchPath, useLocation, useNavigate } from "react-router-dom";
 import { firebaseReady, watchAuth, signOutUser, deleteMyAccount } from "./lib/firebase";
-import { subscribeTrips, createTrip, saveTrip, deleteTrip, joinTrip, removeMember, setChecklistDone } from "./lib/tripsApi";
+import { subscribeTrips, createTrip, saveTrip, deleteTrip, joinTrip, removeMember, setChecklistDone, setPublicShareId } from "./lib/tripsApi";
 import { fetchNickname, setNickname } from "./lib/users";
 import { randomNickname } from "./lib/randomNickname";
 import { checklistItemId, copyChecklist, daysBetween, ensureChecklistIds, makeChecklistId, shiftDate } from "./lib/utils";
@@ -227,10 +227,7 @@ export default function App() {
     if (m.type === "share-link") {
       // Only flips publicShareId; the getPublicTrip function looks the trip
       // up by it on each view. The modal stays open so the new link shows up.
-      const t = structuredClone(trip);
-      if (values.action === "on") t.publicShareId = crypto.randomUUID().replace(/-/g, "");
-      else delete t.publicShareId;
-      await saveTrip(t);
+      await setPublicShareId(tripId, values.action === "on");
       return;
     }
     if (m.type === "transfer-ownership") {
