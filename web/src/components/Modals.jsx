@@ -214,8 +214,17 @@ function ShareLinkForm({ trip, onSubmit, onClose }) {
     setError(null);
     try {
       await onSubmit({ type: "share-link" }, { action });
-    } catch {
-      setError(action === "on" ? "링크를 만들지 못했어요. 잠시 후 다시 시도해주세요." : "링크를 끄지 못했어요. 잠시 후 다시 시도해주세요.");
+    } catch (err) {
+      console.error("[share-link]", err);
+      const what = action === "on" ? "링크를 만들지 못했어요" : "링크를 끄지 못했어요";
+      // Say *why*, so a failure can be told apart from a bug: a blocked or
+      // dropped connection (ad blockers often block Firestore) vs. the
+      // security rules refusing the write.
+      const why =
+        err?.code === "permission-denied" ? "방장만 공개 링크를 바꿀 수 있어요. 새로고침 후 다시 시도해주세요."
+        : err?.code === "unavailable" || !navigator.onLine ? "서버에 연결하지 못했어요. 인터넷 연결이나 광고 차단 확장 프로그램을 확인해주세요."
+        : `잠시 후 다시 시도해주세요.${err?.code ? ` (${err.code})` : ""}`;
+      setError(`${what}. ${why}`);
     } finally {
       setBusy(false);
     }
@@ -242,6 +251,7 @@ function ShareLinkForm({ trip, onSubmit, onClose }) {
             <label>공유 링크</label>
             <input readOnly value={url} onFocus={(e) => e.target.select()} />
           </div>
+          <FormNote message={error} />
           <div className="modal-actions" style={{ justifyContent: "space-between" }}>
             <button type="button" className="btn btn-danger" disabled={busy} onClick={() => toggle("off")}>링크 끄기</button>
             <span className="btn-row">
@@ -251,12 +261,14 @@ function ShareLinkForm({ trip, onSubmit, onClose }) {
           </div>
         </>
       ) : (
-        <div className="modal-actions">
-          <button type="button" className="btn" onClick={onClose}>닫기</button>
-          <button type="button" className="btn btn-primary" disabled={busy} onClick={() => toggle("on")}>{busy ? "만드는 중…" : "공개 링크 만들기"}</button>
-        </div>
+        <>
+          <FormNote message={error} />
+          <div className="modal-actions">
+            <button type="button" className="btn" onClick={onClose}>닫기</button>
+            <button type="button" className="btn btn-primary" disabled={busy} onClick={() => toggle("on")}>{busy ? "만드는 중…" : "공개 링크 만들기"}</button>
+          </div>
+        </>
       )}
-      <FormNote message={error} />
     </div>
   );
 }
