@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useJsApiLoader } from "@react-google-maps/api";
 import { itemKind } from "../lib/utils";
 import { MAPS_LOADER_OPTIONS } from "../lib/mapsLoader";
@@ -560,12 +561,37 @@ function DestinationField({ tripType, defaultValue }) {
   const [suggestions, setSuggestions] = useState([]);
   const [open, setOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1); // keyboard-highlighted suggestion
+  const [listPos, setListPos] = useState(null);
+  const inputRef = useRef(null);
   const debounceRef = useRef(null);
   const skipNextFetchRef = useRef(false);
   const prevTripTypeRef = useRef(tripType);
 
   // A fresh result list starts with nothing highlighted.
   useEffect(() => { setActiveIdx(-1); }, [suggestions]);
+
+  // The list is portaled to <body> and pinned under the input with
+  // position:fixed, so it can hang past the bottom of the modal instead of
+  // being clipped by (and adding a scrollbar to) the modal's own scroll box.
+  // Re-anchored whenever anything scrolls (capture catches the modal too)
+  // or the window resizes.
+  const listShown = open && suggestions.length > 0;
+  useLayoutEffect(() => {
+    if (!listShown) { setListPos(null); return; }
+    function place() {
+      const r = inputRef.current?.getBoundingClientRect();
+      if (!r) return;
+      const top = r.bottom + 4;
+      setListPos({ top, left: r.left, width: r.width, maxHeight: Math.max(160, window.innerHeight - top - 12) });
+    }
+    place();
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => {
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
+    };
+  }, [listShown]);
 
   // Domestic vs international search completely different regions, so a
   // destination picked under one no longer makes sense after switching —
@@ -626,7 +652,6 @@ function DestinationField({ tripType, defaultValue }) {
   // Korean syllable not yet committed) is ignored, since the results on
   // screen don't reflect that last syllable yet.
   function handleKeyDown(e) {
-    const listShown = open && suggestions.length > 0;
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       if (!suggestions.length) return;
       e.preventDefault();
@@ -658,6 +683,7 @@ function DestinationField({ tripType, defaultValue }) {
     <div className="field" style={{ position: "relative" }}>
       <label>목적지</label>
       <input
+        ref={inputRef}
         name="destination"
         placeholder={tripType === "domestic" ? "예: 부산 (검색해서 목록에서 선택)" : "예: 오사카 (검색해서 목록에서 선택)"}
         value={query}
@@ -667,15 +693,17 @@ function DestinationField({ tripType, defaultValue }) {
         onKeyDown={handleKeyDown}
         autoComplete="off"
         role="combobox"
-        aria-expanded={open && suggestions.length > 0}
+        aria-expanded={listShown}
         aria-activedescendant={activeIdx >= 0 ? `dest-opt-${activeIdx}` : undefined}
       />
-      {open && suggestions.length > 0 && (
+      {listShown && listPos && createPortal(
         <div
+          role="listbox"
           style={{
-            position: "absolute", top: "100%", left: 0, right: 0, zIndex: 30,
-            marginTop: 4, background: "var(--surface)",
-            border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden",
+            position: "fixed", top: listPos.top, left: listPos.left, width: listPos.width,
+            maxHeight: listPos.maxHeight, overflowY: "auto", zIndex: 60,
+            background: "var(--surface)",
+            border: "1px solid var(--line)", borderRadius: 10,
             boxShadow: "0 8px 24px rgba(0,0,0,.25)",
           }}
         >
@@ -701,7 +729,8 @@ function DestinationField({ tripType, defaultValue }) {
               {s.sub && <div style={{ fontSize: 12.5, color: "var(--ink-soft)" }}>{s.sub}</div>}
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
