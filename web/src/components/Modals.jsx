@@ -477,7 +477,8 @@ function TripForm({ isEdit, t, trips, onSubmit, onClose }) {
   const [error, setError] = useState(null);
 
   function handleSubmit(e) {
-    if (e.target.querySelector("input[name=destination][data-unconfirmed]")) {
+    const destInput = e.target.querySelector("input[name=destination]");
+    if (destInput?.dataset.unconfirmed || !destInput?.value.trim()) {
       e.preventDefault();
       setError("목적지는 검색한 뒤 목록에서 선택해주세요.");
       return;
@@ -724,6 +725,7 @@ function DestinationField({ tripType, defaultValue }) {
       <input
         ref={inputRef}
         name="destination"
+        required
         placeholder={tripType === "domestic" ? "예: 부산 (검색해서 목록에서 선택)" : "예: 오사카 (검색해서 목록에서 선택)"}
         value={query}
         onChange={(e) => { setQuery(e.target.value); setOpen(true); setNoMatch(false); pendingEnterRef.current = null; }}
