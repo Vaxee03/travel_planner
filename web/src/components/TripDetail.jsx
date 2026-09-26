@@ -29,14 +29,9 @@ export default function TripDetail({ trip, uid, perms, tab, setTab, dayIdx, setD
       <div className="trip-head">
         <div className="trip-head-top">
           <h1>{trip.title}</h1>
-          {perms.isOwner && (
-            <div className="btn-row">
-              <button className="btn btn-sm" onClick={onEditTrip}>여행 정보 수정</button>
-              <button className="btn btn-sm btn-danger" onClick={onDeleteTrip}>삭제</button>
-            </div>
-          )}
+          <button className="back-link" style={{ margin: 0 }} onClick={onBack}>← 여행 목록으로</button>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
             <div className="chips">
               {dday && <span className="chip"><b>{dday}</b></span>}
@@ -45,7 +40,12 @@ export default function TripDetail({ trip, uid, perms, tab, setTab, dayIdx, setD
               <span className="chip nums">📅 {trip.startDate} – {trip.endDate}</span>
               {trip.budgetTotal ? <span className="chip">💴 예산 <b>{fmtMoney(trip.budgetTotal)}원</b></span> : null}
             </div>
-            <button className="back-link" style={{ margin: 0 }} onClick={onBack}>← 여행 목록으로</button>
+            {perms.isOwner && (
+              <div className="btn-row">
+                <button className="btn btn-sm" onClick={onEditTrip}>여행 정보 수정</button>
+                <button className="btn btn-sm btn-danger" onClick={onDeleteTrip}>삭제</button>
+              </div>
+            )}
           </div>
           <div className="btn-row">
             <button className="btn btn-sm" onClick={() => openModal({ type: "invite" })}>🎟 동행자 초대</button>
