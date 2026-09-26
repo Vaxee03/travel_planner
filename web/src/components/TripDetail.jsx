@@ -22,7 +22,8 @@ export default function TripDetail({ trip, uid, perms, tab, setTab, dayIdx, setD
   const dday = ddayLabel(trip);
   const canReview = st === "completed";
   const memberIds = trip.memberIds || [];
-  const nicknames = useNicknames(memberIds);
+  const companionIds = memberIds.filter((id) => id !== trip.ownerId);
+  const nicknames = useNicknames([trip.ownerId, ...memberIds]);
 
   return (
     <>
@@ -58,14 +59,16 @@ export default function TripDetail({ trip, uid, perms, tab, setTab, dayIdx, setD
             </>
           )}
         </div>
-        {memberIds.length > 0 && (
-          <div className="section-note" style={{ marginTop: -11 }}>
-            동행자: {memberIds.map((memberId, i) => (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div className="section-note">
+            방장: 👑 {nicknames[trip.ownerId] || DEFAULT_NICKNAME}
+          </div>
+          <div className="section-note">
+            동행자: {companionIds.length === 0 ? "아직 없어요" : companionIds.map((memberId, i) => (
               <span key={memberId}>
                 {i > 0 ? ", " : ""}
                 {nicknames[memberId] || DEFAULT_NICKNAME}
-                {memberId === trip.ownerId ? " 👑 방장" : ""}
-                {perms.isOwner && memberId !== trip.ownerId && (
+                {perms.isOwner && (
                   <button
                     type="button"
                     className="btn-ghost"
@@ -89,7 +92,7 @@ export default function TripDetail({ trip, uid, perms, tab, setTab, dayIdx, setD
               </button>
             )}
           </div>
-        )}
+        </div>
       </div>
 
       <div className="tabbar">
