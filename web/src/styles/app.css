@@ -20,6 +20,7 @@
   --done:#6b625a;
   --done-soft:#ece7dd;
   --danger:#b8402f;
+  --nickname:#000000;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
@@ -30,6 +31,7 @@
     --upcoming:#c9a35f; --upcoming-soft:#2c2820;
     --ongoing:#7fb8d8; --ongoing-soft:#1e2c34;
     --done:#9a9186; --done-soft:#2a2d33;
+    --nickname:#ffffff;
   }
 }
 :root[data-theme="dark"]{
@@ -40,6 +42,7 @@
   --upcoming:#c9a35f; --upcoming-soft:#2c2820;
   --ongoing:#7fb8d8; --ongoing-soft:#1e2c34;
   --done:#9a9186; --done-soft:#2a2d33;
+  --nickname:#ffffff;
 }
 
 *{ box-sizing:border-box; }
