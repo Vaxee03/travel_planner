@@ -121,7 +121,7 @@ export default function TripDetail({ trip, uid, perms, tab, setTab, dayIdx, setD
       {tab === "budget" && <Budget trip={trip} openModal={openModal} requestDelete={requestDelete} canEdit={perms.budget} />}
       {tab === "checklist" && <Checklist trip={trip} openModal={openModal} requestDelete={requestDelete} toggleCheck={toggleCheck} canEdit={perms.checklist} />}
       {tab === "bookings" && <Bookings trip={trip} openModal={openModal} requestDelete={requestDelete} canEdit={perms.bookings} />}
-      {tab === "restaurants" && <Restaurants trip={trip} />}
+      {tab === "restaurants" && <Restaurants trip={trip} openModal={openModal} canAddToItinerary={perms.itinerary} />}
       {tab === "review" && <Review trip={trip} uid={uid} canReview={canReview} openModal={openModal} requestDelete={requestDelete} />}
     </>
   );

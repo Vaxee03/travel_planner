@@ -1,9 +1,18 @@
 import { useState } from "react";
 import { fetchRestaurantRecommendations } from "../lib/recommendations";
 import { saveTrip } from "../lib/tripsApi";
+import { fmtDate } from "../lib/utils";
 import InfoTooltip from "./InfoTooltip";
 
-export default function Restaurants({ trip }) {
+/** Dates of the days that already hold an item added from this
+ * recommendation (tagged with `restaurant` when it was added). */
+function addedDates(trip, name) {
+  return (trip.days || [])
+    .filter((d) => (d.items || []).some((it) => it.restaurant === name))
+    .map((d) => fmtDate(d.date));
+}
+
+export default function Restaurants({ trip, openModal, canAddToItinerary }) {
   const [preferences, setPreferences] = useState(trip.restaurantRecs?.preferences || "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -65,16 +74,31 @@ export default function Restaurants({ trip }) {
                 {rec.destination} 기준 추천{rec.preferences ? ` · "${rec.preferences}" 조건` : ""} · {new Date(rec.generatedAt).toLocaleString("ko-KR")}
               </div>
               <div className="food-results">
-                {rec.items.map((item, idx) => (
-                  <div className="food-card" key={idx}>
-                    <div className="food-card-top">
-                      <span className="food-card-name">{item.name}</span>
-                      {item.category && <span className="food-card-tag">{item.category}</span>}
+                {rec.items.map((item, idx) => {
+                  const added = addedDates(trip, item.name);
+                  return (
+                    <div className="food-card" key={idx}>
+                      <div className="food-card-top">
+                        <span className="food-card-name">{item.name}</span>
+                        {item.category && <span className="food-card-tag">{item.category}</span>}
+                      </div>
+                      {item.reason && <div className="food-card-why">{item.reason}</div>}
+                      {item.address && <div className="food-card-why">📍 {item.address}</div>}
+                      {(canAddToItinerary || added.length > 0) && (
+                        <div className="btn-row" style={{ marginTop: 10, alignItems: "center" }}>
+                          {canAddToItinerary && (
+                            <button className="btn btn-sm" onClick={() => openModal({ type: "add-restaurant", restaurant: item })}>
+                              📅 일정에 추가
+                            </button>
+                          )}
+                          {added.length > 0 && (
+                            <span className="section-note" style={{ color: "var(--confirmed)" }}>✓ {added.join(", ")} 일정에 추가됨</span>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    {item.reason && <div className="food-card-why">{item.reason}</div>}
-                    {item.address && <div className="food-card-why">📍 {item.address}</div>}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </>
           )}

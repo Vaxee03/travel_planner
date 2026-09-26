@@ -308,9 +308,10 @@ export default function App() {
       closeModal();
       return;
     }
-    if (m.type === "add-item" || m.type === "edit-item") {
+    if (m.type === "add-item" || m.type === "edit-item" || m.type === "add-restaurant") {
       const t = structuredClone(trip);
-      const day = t.days[m.dayIdx];
+      const dayIdx = m.type === "add-restaurant" ? Number(values.dayIdx) || 0 : m.dayIdx;
+      const day = t.days[dayIdx];
       day.items = day.items || [];
       const kind = values.kind === "label" ? "label" : "time";
       const item = {
@@ -319,8 +320,12 @@ export default function App() {
         text: values.text,
       };
       if (values.locationJson) item.location = JSON.parse(values.locationJson);
-      if (m.type === "add-item") day.items.push(item);
-      else day.items[m.idx] = item;
+      // Tags the item with the recommendation it came from, so the 맛집 tab
+      // can show "✓ 일정에 추가됨" even if the user renamed the item.
+      if (m.type === "add-restaurant") item.restaurant = m.restaurant.name;
+      else if (m.type === "edit-item" && day.items[m.idx]?.restaurant) item.restaurant = day.items[m.idx].restaurant;
+      if (m.type === "edit-item") day.items[m.idx] = item;
+      else day.items.push(item);
       await saveTrip(t);
       closeModal();
       return;

@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useJsApiLoader } from "@react-google-maps/api";
-import { itemKind } from "../lib/utils";
+import { fmtDate, itemKind } from "../lib/utils";
 import { MAPS_LOADER_OPTIONS } from "../lib/mapsLoader";
-import { fetchCitySuggestions, INTERNATIONAL_REGION_CODES } from "../lib/placeSearch";
+import { fetchCitySuggestions, findPlaceLocation, INTERNATIONAL_REGION_CODES } from "../lib/placeSearch";
 import { EXTRA_INTERNATIONAL_DESTINATIONS } from "../lib/extraDestinations";
 import MapPicker from "./MapPicker";
 import InviteCard from "./InviteCard";
@@ -423,6 +423,8 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit }
     content = <LocationViewer location={modal.location} label={modal.label} onClose={onClose} />;
   } else if (modal.type === "delete-account") {
     content = <DeleteAccountForm modal={modal} onSubmit={onSubmit} onClose={onClose} />;
+  } else if (modal.type === "add-restaurant") {
+    content = <RestaurantItemForm trip={trip} restaurant={modal.restaurant} onSubmit={handleSubmit} onClose={onClose} />;
   } else if (modal.type === "share-link") {
     content = <ShareLinkForm trip={trip} onSubmit={onSubmit} onClose={onClose} />;
   } else if (modal.type === "view-route") {
@@ -459,7 +461,7 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit }
     );
   }
 
-  const isWide = modal.type === "add-item" || modal.type === "edit-item" || modal.type === "invite" || modal.type === "view-location" || modal.type === "view-route" || modal.type === "manage-permissions";
+  const isWide = modal.type === "add-item" || modal.type === "edit-item" || modal.type === "add-restaurant" || modal.type === "invite" || modal.type === "view-location" || modal.type === "view-route" || modal.type === "manage-permissions";
   return (
     <div className="modal-overlay">
       <div className={"modal" + (isWide ? " modal-wide" : "")} onClick={(e) => e.stopPropagation()}>
@@ -786,8 +788,68 @@ function DestinationField({ tripType, defaultValue }) {
   );
 }
 
-function ItemForm({ isEdit, it, destination, onSubmit, onClose }) {
-  const initialKind = isEdit ? itemKind(it) : "time";
+/** 맛집 추천 → 일정: looks up the restaurant's pin once (a single billed
+ * Places call, only because the user asked to add it), then opens the
+ * regular item form pre-filled with a day picker, "식사" label, the name
+ * and that pin — any of which the user can still change. */
+function RestaurantItemForm({ trip, restaurant, onSubmit, onClose }) {
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  const { isLoaded, loadError } = useJsApiLoader({ googleMapsApiKey: apiKey || "", ...MAPS_LOADER_OPTIONS });
+  const [location, setLocation] = useState(undefined); // undefined = still looking
+  const days = trip.days || [];
+
+  useEffect(() => {
+    if (!days.length) return;
+    if (!apiKey || loadError) { setLocation(null); return; }
+    if (!isLoaded) return;
+    let cancelled = false;
+    findPlaceLocation(restaurant.name, restaurant.address, trip.destination).then((loc) => { if (!cancelled) setLocation(loc); });
+    return () => { cancelled = true; };
+  }, [isLoaded, loadError]);
+
+  if (!days.length) {
+    return (
+      <div>
+        <h3>일정에 추가</h3>
+        <div className="empty">먼저 일정 탭에서 날짜를 추가해주세요.</div>
+        <div className="modal-actions"><button type="button" className="btn" onClick={onClose}>닫기</button></div>
+      </div>
+    );
+  }
+  if (location === undefined) {
+    return (
+      <div>
+        <h3>일정에 추가</h3>
+        <div className="empty">"{restaurant.name}" 위치를 찾는 중이에요…</div>
+      </div>
+    );
+  }
+
+  const prefill = { kind: "label", time: "식사", text: `🍽 ${restaurant.name}` };
+  let notice = "위치를 자동으로 찾지 못했어요. 필요하면 아래 \"지도에서 위치 찍기\"로 직접 찍어주세요.";
+  if (location) {
+    const { placeName, ...pin } = location;
+    prefill.location = pin;
+    notice = placeName
+      ? `지도에서 "${placeName}"(으)로 위치를 찾았어요. 다른 곳이면 아래 "다시 찍기"로 고쳐주세요.`
+      : "주소로 위치를 찾았어요. 다른 곳이면 아래 \"다시 찍기\"로 고쳐주세요.";
+  }
+  return (
+    <ItemForm
+      title={`"${restaurant.name}" 일정에 추가`}
+      it={prefill}
+      prefilled
+      notice={notice}
+      dayOptions={days}
+      destination={trip.destination}
+      onSubmit={onSubmit}
+      onClose={onClose}
+    />
+  );
+}
+
+function ItemForm({ isEdit, it, prefilled, title, notice, dayOptions, destination, onSubmit, onClose }) {
+  const initialKind = isEdit || prefilled ? itemKind(it) : "time";
   const [kind, setKind] = useState(initialKind);
   const [error, setError] = useState(null);
 
@@ -803,7 +865,18 @@ function ItemForm({ isEdit, it, destination, onSubmit, onClose }) {
 
   return (
     <form onSubmit={handleSubmit} noValidate>
-      <h3>{isEdit ? "항목 수정" : "항목 추가"}</h3>
+      <h3>{title || (isEdit ? "항목 수정" : "항목 추가")}</h3>
+      {notice && <p style={{ margin: "-6px 0 14px", color: "var(--ink-soft)", fontSize: 13.5 }}>{notice}</p>}
+      {dayOptions && (
+        <div className="field">
+          <label>날짜</label>
+          <select name="dayIdx" defaultValue="0">
+            {dayOptions.map((d, i) => (
+              <option key={i} value={i}>{fmtDate(d.date)}{d.summary ? ` · ${d.summary}` : ""}</option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="field">
         <label>유형</label>
         <div className="btn-row" style={{ gap: 16 }}>
