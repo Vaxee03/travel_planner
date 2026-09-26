@@ -152,6 +152,55 @@ function TransferOwnershipForm({ trip, onSubmit, onClose }) {
   );
 }
 
+/** 회원 탈퇴 — typed confirmation, since this can't be undone. Keeps its own
+ * pending/error state because the server-side cleanup takes a few seconds. */
+function DeleteAccountForm({ modal, onSubmit, onClose }) {
+  const [confirmText, setConfirmText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (confirmText.trim() !== "탈퇴") return;
+    setBusy(true);
+    setError(null);
+    try {
+      await onSubmit(modal, {});
+    } catch {
+      setError("탈퇴 처리 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} noValidate>
+      <h3>회원 탈퇴</h3>
+      <ul style={{ margin: "0 0 16px", paddingLeft: 18, color: "var(--ink-soft)", fontSize: 13.5, lineHeight: 1.7 }}>
+        <li>혼자 쓰던 여행은 사진까지 모두 삭제돼요.</li>
+        <li>동행자가 있는 여행에서 내가 방장이면, 가장 먼저 참여한 동행자에게 방장이 넘어가요.</li>
+        <li>참여 중인 여행에서는 빠지고, 내가 쓴 후기와 사진은 삭제돼요.</li>
+        <li>계정과 닉네임이 삭제되며 <b>되돌릴 수 없어요.</b></li>
+      </ul>
+      <div className="field">
+        <label>확인을 위해 "탈퇴"라고 입력해주세요</label>
+        <input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} placeholder="탈퇴" autoComplete="off" />
+      </div>
+      <FormNote message={error} />
+      <div className="modal-actions">
+        <button type="button" className="btn" onClick={onClose} disabled={busy}>취소</button>
+        <button
+          type="submit"
+          className="btn btn-primary"
+          style={{ background: "var(--danger)", borderColor: "var(--danger)" }}
+          disabled={busy || confirmText.trim() !== "탈퇴"}
+        >
+          {busy ? "처리 중…" : "탈퇴하기"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 /** 방장 only — turns the read-only public itinerary link on/off. */
 function ShareLinkForm({ trip, onSubmit, onClose }) {
   const [copied, setCopied] = useState(false);
@@ -356,6 +405,8 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit }
     content = <TransferOwnershipForm trip={trip} onSubmit={handleSubmit} onClose={onClose} />;
   } else if (modal.type === "view-location") {
     content = <LocationViewer location={modal.location} label={modal.label} onClose={onClose} />;
+  } else if (modal.type === "delete-account") {
+    content = <DeleteAccountForm modal={modal} onSubmit={onSubmit} onClose={onClose} />;
   } else if (modal.type === "share-link") {
     content = <ShareLinkForm trip={trip} onSubmit={onSubmit} onClose={onClose} />;
   } else if (modal.type === "view-route") {

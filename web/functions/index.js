@@ -1,7 +1,9 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { initializeApp } = require("firebase-admin/app");
-const { getFirestore } = require("firebase-admin/firestore");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const { getAuth } = require("firebase-admin/auth");
+const { getStorage } = require("firebase-admin/storage");
 const { GoogleGenAI } = require("@google/genai");
 
 initializeApp();
@@ -36,6 +38,60 @@ function publicTripCopy(trip) {
     updatedAt: Date.now(),
   };
 }
+
+// 회원 탈퇴. Runs server-side because it has to touch trips the caller can
+// no longer edit under the security rules and delete their Auth account.
+// For every trip the caller is in:
+//   - alone in it            → the trip (and its uploaded photos) is deleted
+//   - 방장 with other members → 방장 passes to the earliest-joined remaining
+//                               member (memberIds keeps join order)
+//   - otherwise              → they're just removed, along with their
+//                               review posts and review photos
+// then their nickname doc and Auth account are deleted.
+exports.deleteAccount = onCall({ region: "us-central1" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "로그인이 필요해요.");
+  }
+  const uid = request.auth.uid;
+  const bucket = getStorage().bucket();
+  const trips = await db.collection("trips").where("memberIds", "array-contains", uid).get();
+  let deletedTrips = 0;
+
+  for (const snap of trips.docs) {
+    const trip = snap.data();
+    const others = (trip.memberIds || []).filter((id) => id !== uid);
+
+    if (others.length === 0) {
+      await bucket.deleteFiles({ prefix: `trips/${snap.id}/` }).catch(() => {});
+      await snap.ref.delete();
+      deletedTrips += 1;
+      continue;
+    }
+
+    const myReviews = (trip.reviews || []).filter((r) => r.authorId === uid);
+    for (const r of myReviews) {
+      for (const p of r.photos || []) {
+        if (p.path) await bucket.file(p.path).delete().catch(() => {});
+      }
+    }
+
+    const update = {
+      memberIds: FieldValue.arrayRemove(uid),
+      [`memberPermissions.${uid}`]: FieldValue.delete(),
+    };
+    if (myReviews.length) update.reviews = trip.reviews.filter((r) => r.authorId !== uid);
+    if (trip.ownerId === uid) {
+      update.ownerId = others[0];
+      // The new 방장 has every permission anyway; drop their now-moot grants.
+      update[`memberPermissions.${others[0]}`] = FieldValue.delete();
+    }
+    await snap.ref.update(update);
+  }
+
+  await db.doc(`users/${uid}`).delete();
+  await getAuth().deleteUser(uid);
+  return { deletedTrips };
+});
 
 // Keeps publicTrips/{publicShareId} in step with the trip: rewritten on
 // every trip change while the link is on, removed when the 방장 turns the

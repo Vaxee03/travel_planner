@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test:rules": "npx --yes firebase-tools@13 emulators:exec --only firestore \"node --test tests/\""
+    "test:rules": "npx --yes firebase-tools@13 emulators:exec --only firestore \"node --test tests/\"",
+    "dev:emulator": "vite --mode emulator"
   },
   "dependencies": {
     "@react-google-maps/api": "^2.20.8",

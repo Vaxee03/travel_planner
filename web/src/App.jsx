@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { matchPath, useLocation, useNavigate } from "react-router-dom";
-import { firebaseReady, watchAuth, signOutUser } from "./lib/firebase";
+import { Link, matchPath, useLocation, useNavigate } from "react-router-dom";
+import { firebaseReady, watchAuth, signOutUser, deleteMyAccount } from "./lib/firebase";
 import { subscribeTrips, createTrip, saveTrip, deleteTrip, joinTrip, removeMember, setChecklistDone } from "./lib/tripsApi";
 import { fetchNickname, setNickname } from "./lib/users";
 import { randomNickname } from "./lib/randomNickname";
@@ -11,6 +11,7 @@ import TripDetail from "./components/TripDetail";
 import ModalHost from "./components/Modals";
 import AuthGate from "./components/AuthGate";
 import PublicTripView from "./components/PublicTripView";
+import { TermsPage, PrivacyPage } from "./components/LegalPage";
 
 const TAB_KEYS = ["itinerary", "budget", "checklist", "bookings", "restaurants", "review"];
 
@@ -66,7 +67,8 @@ export default function App() {
   }, [user, navigate]);
 
   // Any other path (typo, old bookmark) just falls back to the trip list.
-  const knownPath = Boolean(location.pathname === "/" || tripMatch || joinMatch || shareMatch);
+  const legalPage = location.pathname === "/terms" ? "terms" : location.pathname === "/privacy" ? "privacy" : null;
+  const knownPath = Boolean(location.pathname === "/" || tripMatch || joinMatch || shareMatch || legalPage);
   useEffect(() => {
     if (!knownPath) navigate("/", { replace: true });
   }, [knownPath, navigate]);
@@ -214,6 +216,12 @@ export default function App() {
       t.memberPermissions = next;
       await saveTrip(t);
       closeModal();
+      return;
+    }
+    if (m.type === "delete-account") {
+      await deleteMyAccount();
+      closeModal();
+      navigate("/", { replace: true });
       return;
     }
     if (m.type === "share-link") {
@@ -393,7 +401,11 @@ export default function App() {
         </div>
       </header>
 
-      {shareMatch ? (
+      {legalPage === "terms" ? (
+        <TermsPage />
+      ) : legalPage === "privacy" ? (
+        <PrivacyPage />
+      ) : shareMatch ? (
         <PublicTripView shareId={shareMatch.params.shareId} />
       ) : authError ? (
         <div className="empty">{authError}</div>
@@ -433,7 +445,14 @@ export default function App() {
         </div>
       )}
 
-      {user && <footer className="app-footer">여행 플래너 · {trips.length}개 여행 관리 중</footer>}
+      <footer className="app-footer">
+        {user && <>여행 플래너 · {trips.length}개 여행 관리 중<br /></>}
+        <span className="footer-links">
+          <Link to="/terms">이용약관</Link>
+          <Link to="/privacy"><b>개인정보처리방침</b></Link>
+          {user && <button type="button" className="btn-ghost" onClick={() => setModal({ type: "delete-account" })}>회원 탈퇴</button>}
+        </span>
+      </footer>
 
       <ModalHost modal={modal} trip={trip} trips={trips} uid={user?.uid} onClose={closeModal} onSubmit={handleModalSubmit} />
     </div>

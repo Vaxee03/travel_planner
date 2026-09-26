@@ -1,9 +1,9 @@
 import { initializeApp } from "firebase/app";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, connectFirestoreEmulator } from "firebase/firestore";
 import { getStorage, connectStorageEmulator } from "firebase/storage";
-import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
+import { getFunctions, connectFunctionsEmulator, httpsCallable } from "firebase/functions";
 import {
-  getAuth, onAuthStateChanged, connectAuthEmulator, signInWithEmailAndPassword,
+  getAuth, onAuthStateChanged, connectAuthEmulator, signInWithCustomToken, signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut, GoogleAuthProvider, OAuthProvider, signInWithPopup,
 } from "firebase/auth";
@@ -42,10 +42,21 @@ if (firebaseReady) {
   // Local-only: `VITE_USE_EMULATORS=1 npm run dev` points everything at the
   // Firebase emulators (firebase emulators:start) instead of production.
   if (import.meta.env.VITE_USE_EMULATORS === "1") {
-    connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+    connectAuthEmulator(auth, "http://127.0.0.1:9299", { disableWarnings: true });
     connectFirestoreEmulator(db, "127.0.0.1", 8080);
     connectStorageEmulator(storage, "127.0.0.1", 9199);
     connectFunctionsEmulator(functions, "127.0.0.1", 5001);
+    // Test hook: sign in as an arbitrary fake user via an unsigned custom
+    // token, which only the Auth emulator accepts. Never exists in prod builds.
+    window.__emulatorSignIn = (uid) => {
+      const b64 = (o) => btoa(JSON.stringify(o)).replace(/=+$/, "");
+      const now = Math.floor(Date.now() / 1000);
+      const token = `${b64({ alg: "none", typ: "JWT" })}.${b64({
+        iss: "emulator", sub: "emulator", uid, iat: now, exp: now + 3600,
+        aud: "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit",
+      })}.`;
+      return signInWithCustomToken(auth, token);
+    };
   }
 } else {
   console.warn(
@@ -71,6 +82,13 @@ export function signUp(email, password) {
 
 export function signOutUser() {
   return signOut(auth);
+}
+
+/** 회원 탈퇴 — the deleteAccount function does the cleanup and deletes the
+ * Auth account server-side; this just drops the now-dead local session. */
+export async function deleteMyAccount() {
+  await httpsCallable(functions, "deleteAccount")();
+  await signOut(auth).catch(() => {});
 }
 
 export function signInWithGoogle() {

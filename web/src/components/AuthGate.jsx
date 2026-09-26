@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { signIn, signUp, signInWithGoogle, signInWithKakao, authErrorMessage } from "../lib/firebase";
 
 export default function AuthGate({ onAuthed }) {
@@ -100,6 +101,10 @@ export default function AuthGate({ onAuthed }) {
             {loading ? "처리 중…" : mode === "signup" ? "회원가입" : "로그인"}
           </button>
         </form>
+
+        <p className="section-note" style={{ marginTop: 12, textAlign: "center" }}>
+          가입하거나 소셜 계정으로 계속하면 <Link to="/terms">이용약관</Link> 및 <Link to="/privacy">개인정보처리방침</Link>에 동의하는 것으로 간주돼요.
+        </p>
 
         <div className="btn-row" style={{ margin: "18px 0", color: "var(--ink-soft)", fontSize: 12.5 }}>
           <div style={{ flex: 1, height: 1, background: "var(--line)" }} />
