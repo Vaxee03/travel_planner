@@ -68,13 +68,9 @@ test("only 방장 can toggle the public share link", async () => {
   await assertSucceeds(updateDoc(doc(db("owner"), "trips/t1"), { publicShareId: "abc" }));
 });
 
-test("public trip copies are world-readable but never client-writable", async () => {
-  await env.withSecurityRulesDisabled((ctx) =>
-    setDoc(doc(ctx.firestore(), "publicTrips/abc"), { title: "여행", days: [] }));
+test("signed-out visitors can't read trips directly (share links go through getPublicTrip)", async () => {
   const anon = env.unauthenticatedContext().firestore();
-  await assertSucceeds(getDoc(doc(anon, "publicTrips/abc")));
-  await assertFails(setDoc(doc(anon, "publicTrips/abc"), { title: "x" }));
-  await assertFails(setDoc(doc(db("owner"), "publicTrips/abc"), { title: "x" }));
+  await assertFails(getDoc(doc(anon, "trips/t1")));
 });
 
 test("budget permission still gates budget items (settlement fields included)", async () => {

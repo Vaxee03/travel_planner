@@ -9,7 +9,8 @@ import {
 import {
   ref, uploadBytes, getDownloadURL, deleteObject,
 } from "firebase/storage";
-import { db, storage } from "./firebase";
+import { httpsCallable } from "firebase/functions";
+import { db, storage, functions } from "./firebase";
 import { emptyTrip } from "./utils";
 
 const tripsCol = () => collection(db, "trips");
@@ -71,15 +72,17 @@ export function setChecklistDone(tripId, itemId, done) {
   return updateDoc(doc(db, "trips", tripId), { [`checklistDone.${itemId}`]: done });
 }
 
-/** Live read-only itinerary behind a public share link (no sign-in needed).
- * Calls onChange(null) while the copy doesn't exist — the link was turned
- * off, or it was just turned on and the sync function hasn't written it yet. */
-export function subscribePublicTrip(shareId, onChange, onError) {
-  return onSnapshot(
-    doc(db, "publicTrips", shareId),
-    (snap) => onChange(snap.exists() ? snap.data() : null),
-    onError
-  );
+/** Read-only itinerary behind a public share link (no sign-in needed),
+ * served by the getPublicTrip function. Resolves null when the link was
+ * turned off or never existed. */
+export async function fetchPublicTrip(shareId) {
+  try {
+    const res = await httpsCallable(functions, "getPublicTrip")({ shareId });
+    return res.data;
+  } catch (err) {
+    if (err?.code === "functions/not-found") return null;
+    throw err;
+  }
 }
 
 export async function uploadReviewPhoto(tripId, file) {

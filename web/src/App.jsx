@@ -225,8 +225,8 @@ export default function App() {
       return;
     }
     if (m.type === "share-link") {
-      // Only flips publicShareId; the syncPublicTrip function writes/removes
-      // the public copy. The modal stays open so the new link shows up.
+      // Only flips publicShareId; the getPublicTrip function looks the trip
+      // up by it on each view. The modal stays open so the new link shows up.
       const t = structuredClone(trip);
       if (values.action === "on") t.publicShareId = crypto.randomUUID().replace(/-/g, "");
       else delete t.publicShareId;

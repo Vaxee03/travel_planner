@@ -76,15 +76,6 @@ service cloud.firestore {
       }
     }
 
-    // Read-only itinerary copies behind a trip's public share link. Written
-    // only by the syncPublicTrip Cloud Function (Admin SDK bypasses rules),
-    // which copies just the itinerary — never bookings, budget or members.
-    // The doc id is an unguessable random string, so reads are open.
-    match /publicTrips/{shareId} {
-      allow read: if true;
-      allow write: if false;
-    }
-
     // Account-level nickname. Readable by any signed-in user (needed to show
     // other trip members' nicknames), but only the owner can write their own.
     match /users/{uid} {

@@ -1,31 +1,31 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { subscribePublicTrip } from "../lib/tripsApi";
+import { fetchPublicTrip } from "../lib/tripsApi";
 import { fmtDate, splitItems } from "../lib/utils";
 
 /** /share/:shareId — the read-only itinerary a 방장 shared publicly. Works
- * signed out; shows only what the syncPublicTrip function copied over. */
+ * signed out; shows only what the getPublicTrip function returns. */
 export default function PublicTripView({ shareId }) {
   const [trip, setTrip] = useState(undefined); // undefined = loading, null = not found
-  const [slow, setSlow] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     setTrip(undefined);
-    setSlow(false);
-    // A just-enabled link can take a few seconds to appear, so don't call
-    // it missing right away.
-    const timer = setTimeout(() => setSlow(true), 6000);
-    const unsub = subscribePublicTrip(shareId, setTrip, () => setTrip(null));
-    return () => { clearTimeout(timer); unsub(); };
+    setFailed(false);
+    fetchPublicTrip(shareId)
+      .then((t) => { if (!cancelled) setTrip(t); })
+      .catch(() => { if (!cancelled) { setFailed(true); setTrip(null); } });
+    return () => { cancelled = true; };
   }, [shareId]);
 
-  if (trip === undefined || (trip === null && !slow)) {
+  if (trip === undefined) {
     return <div className="empty">공유된 일정을 불러오는 중이에요…</div>;
   }
   if (trip === null) {
     return (
       <div className="empty">
-        공유가 중지됐거나 없는 링크예요.
+        {failed ? "일정을 불러오지 못했어요. 잠시 후 다시 시도해주세요." : "공유가 중지됐거나 없는 링크예요."}
         <div style={{ marginTop: 12 }}><Link className="btn" to="/">여행 플래너로 가기</Link></div>
       </div>
     );

@@ -204,7 +204,21 @@ function DeleteAccountForm({ modal, onSubmit, onClose }) {
 /** 방장 only — turns the read-only public itinerary link on/off. */
 function ShareLinkForm({ trip, onSubmit, onClose }) {
   const [copied, setCopied] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
   const url = trip.publicShareId ? `${window.location.origin}/share/${trip.publicShareId}` : "";
+
+  async function toggle(action) {
+    setBusy(true);
+    setError(null);
+    try {
+      await onSubmit({ type: "share-link" }, { action });
+    } catch {
+      setError(action === "on" ? "링크를 만들지 못했어요. 잠시 후 다시 시도해주세요." : "링크를 끄지 못했어요. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function copy() {
     try {
@@ -228,7 +242,7 @@ function ShareLinkForm({ trip, onSubmit, onClose }) {
             <input readOnly value={url} onFocus={(e) => e.target.select()} />
           </div>
           <div className="modal-actions" style={{ justifyContent: "space-between" }}>
-            <button type="button" className="btn btn-danger" onClick={() => onSubmit({ type: "share-link" }, { action: "off" })}>링크 끄기</button>
+            <button type="button" className="btn btn-danger" disabled={busy} onClick={() => toggle("off")}>링크 끄기</button>
             <span className="btn-row">
               <button type="button" className="btn" onClick={onClose}>닫기</button>
               <button type="button" className="btn btn-primary" onClick={copy}>{copied ? "복사됨 ✓" : "링크 복사"}</button>
@@ -238,9 +252,10 @@ function ShareLinkForm({ trip, onSubmit, onClose }) {
       ) : (
         <div className="modal-actions">
           <button type="button" className="btn" onClick={onClose}>닫기</button>
-          <button type="button" className="btn btn-primary" onClick={() => onSubmit({ type: "share-link" }, { action: "on" })}>공개 링크 만들기</button>
+          <button type="button" className="btn btn-primary" disabled={busy} onClick={() => toggle("on")}>{busy ? "만드는 중…" : "공개 링크 만들기"}</button>
         </div>
       )}
+      <FormNote message={error} />
     </div>
   );
 }

@@ -1,5 +1,4 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
-const { onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
@@ -8,10 +7,8 @@ const { GoogleGenAI } = require("@google/genai");
 
 initializeApp();
 
-// The app's named Firestore database (firebase.json → firestore.database),
-// which lives in Seoul — Firestore triggers must run in the same region.
+// The app's named Firestore database (firebase.json → firestore.database).
 const DATABASE_ID = "travelplanner";
-const DATABASE_REGION = "asia-northeast3";
 const db = getFirestore(DATABASE_ID);
 
 /** What a public share link exposes: the itinerary only. Budget, bookings
@@ -35,9 +32,24 @@ function publicTripCopy(trip) {
         return item;
       }),
     })),
-    updatedAt: Date.now(),
   };
 }
+
+// /share/:shareId — looks the trip up by its public link id on every view
+// and returns just the itinerary. Callable without sign-in; the id is a
+// random 32-hex string only the 방장 hands out, and turning the link off
+// (clearing publicShareId) makes it stop resolving immediately.
+exports.getPublicTrip = onCall({ region: "us-central1" }, async (request) => {
+  const shareId = String(request.data?.shareId || "");
+  if (!/^[0-9a-f]{32}$/.test(shareId)) {
+    throw new HttpsError("not-found", "공유가 중지됐거나 없는 링크예요.");
+  }
+  const snap = await db.collection("trips").where("publicShareId", "==", shareId).limit(1).get();
+  if (snap.empty) {
+    throw new HttpsError("not-found", "공유가 중지됐거나 없는 링크예요.");
+  }
+  return publicTripCopy(snap.docs[0].data());
+});
 
 // 회원 탈퇴. Runs server-side because it has to touch trips the caller can
 // no longer edit under the security rules and delete their Auth account.
@@ -92,21 +104,6 @@ exports.deleteAccount = onCall({ region: "us-central1" }, async (request) => {
   await getAuth().deleteUser(uid);
   return { deletedTrips };
 });
-
-// Keeps publicTrips/{publicShareId} in step with the trip: rewritten on
-// every trip change while the link is on, removed when the 방장 turns the
-// link off (or regenerates it) and when the trip itself is deleted.
-exports.syncPublicTrip = onDocumentWritten(
-  { document: "trips/{tripId}", database: DATABASE_ID, region: DATABASE_REGION },
-  async (event) => {
-    const before = event.data?.before?.data();
-    const after = event.data?.after?.data();
-    const oldId = before?.publicShareId;
-    const newId = after?.publicShareId;
-    if (oldId && oldId !== newId) await db.doc(`publicTrips/${oldId}`).delete();
-    if (newId) await db.doc(`publicTrips/${newId}`).set(publicTripCopy(after));
-  }
-);
 
 const MODEL = "gemini-3.6-flash";
 
