@@ -559,9 +559,13 @@ function DestinationField({ tripType, defaultValue }) {
   const [selected, setSelected] = useState(defaultValue || "");
   const [suggestions, setSuggestions] = useState([]);
   const [open, setOpen] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(-1); // keyboard-highlighted suggestion
   const debounceRef = useRef(null);
   const skipNextFetchRef = useRef(false);
   const prevTripTypeRef = useRef(tripType);
+
+  // A fresh result list starts with nothing highlighted.
+  useEffect(() => { setActiveIdx(-1); }, [suggestions]);
 
   // Domestic vs international search completely different regions, so a
   // destination picked under one no longer makes sense after switching —
@@ -616,6 +620,31 @@ function DestinationField({ tripType, defaultValue }) {
     setOpen(false);
   }
 
+  // ↑/↓ move the highlight, Enter picks it (or the first result if nothing
+  // is highlighted yet), Esc closes the list. Enter never submits the whole
+  // trip form while the list is showing. Enter pressed mid-composition (a
+  // Korean syllable not yet committed) is ignored, since the results on
+  // screen don't reflect that last syllable yet.
+  function handleKeyDown(e) {
+    const listShown = open && suggestions.length > 0;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      if (!suggestions.length) return;
+      e.preventDefault();
+      setOpen(true);
+      const n = suggestions.length;
+      setActiveIdx((i) => (e.key === "ArrowDown" ? (i + 1) % n : i <= 0 ? n - 1 : i - 1));
+    } else if (e.key === "Enter") {
+      if (!listShown) return;
+      e.preventDefault();
+      if (e.nativeEvent.isComposing) return;
+      pick(suggestions[activeIdx >= 0 ? activeIdx : 0]);
+    } else if (e.key === "Escape" && listShown) {
+      e.preventDefault();
+      e.stopPropagation();
+      setOpen(false);
+    }
+  }
+
   function handleBlur() {
     setOpen(false);
     const trimmed = query.trim();
@@ -635,7 +664,11 @@ function DestinationField({ tripType, defaultValue }) {
         onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}
         onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
         autoComplete="off"
+        role="combobox"
+        aria-expanded={open && suggestions.length > 0}
+        aria-activedescendant={activeIdx >= 0 ? `dest-opt-${activeIdx}` : undefined}
       />
       {open && suggestions.length > 0 && (
         <div
@@ -649,11 +682,17 @@ function DestinationField({ tripType, defaultValue }) {
           {suggestions.map((s, i) => (
             <button
               key={`${s.city}-${i}`}
+              id={`dest-opt-${i}`}
               type="button"
+              role="option"
+              aria-selected={i === activeIdx}
+              tabIndex={-1}
               onMouseDown={(e) => e.preventDefault()}
+              onMouseEnter={() => setActiveIdx(i)}
               onClick={() => pick(s)}
               style={{
-                display: "block", width: "100%", textAlign: "left", background: "none",
+                display: "block", width: "100%", textAlign: "left",
+                background: i === activeIdx ? "var(--accent-soft)" : "none",
                 border: "none", borderBottom: i < suggestions.length - 1 ? "1px solid var(--line)" : "none",
                 padding: "10px 12px", cursor: "pointer", color: "var(--ink)", font: "inherit",
               }}
