@@ -29,7 +29,7 @@ export default function Review({ trip, uid, canReview, openModal, requestDelete 
     setUploading(true);
     setError(null);
     try {
-      const { url, path } = await uploadReviewPhoto(trip.id, file);
+      const { url, path } = await uploadReviewPhoto(trip.id, uid, file);
       const t = structuredClone(trip);
       t.reviews = t.reviews || [];
       const idx = t.reviews.findIndex((r) => r.authorId === uid);

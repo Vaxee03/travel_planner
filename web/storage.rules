@@ -1,11 +1,28 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Any signed-in (anonymous is fine) user may read/write review photos.
-    // Trip-level membership isn't checked here for simplicity in this MVP —
-    // photo paths are namespaced by trip id and not discoverable without it.
+    // Membership is checked against the trip document itself (cross-service
+    // rule into the app's named Firestore database), so only people actually
+    // in the trip can see or touch its photos.
+    function isMember(tripId) {
+      return request.auth != null &&
+        request.auth.uid in firestore.get(/databases/travelplanner/documents/trips/$(tripId)).data.memberIds;
+    }
+
+    // Review photos: each member uploads into their own folder, so only the
+    // uploader can delete theirs. Images only, 10MB max.
+    match /trips/{tripId}/review/{ownerUid}/{fileName} {
+      allow read: if isMember(tripId);
+      allow create: if isMember(tripId) && request.auth.uid == ownerUid
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if isMember(tripId) && request.auth.uid == ownerUid;
+    }
+
+    // Photos uploaded before the per-member folders existed: members can still
+    // view and remove them, but nothing new lands at this level anymore.
     match /trips/{tripId}/review/{fileName} {
-      allow read, write: if request.auth != null;
+      allow read, delete: if isMember(tripId);
     }
   }
 }

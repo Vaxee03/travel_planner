@@ -101,8 +101,10 @@ export async function fetchPublicTrip(shareId) {
   }
 }
 
-export async function uploadReviewPhoto(tripId, file) {
-  const path = `trips/${tripId}/review/${Date.now()}_${file.name}`;
+/** Stored under the uploader's own folder — storage.rules only lets that
+ * member delete it. */
+export async function uploadReviewPhoto(tripId, uid, file) {
+  const path = `trips/${tripId}/review/${uid}/${Date.now()}_${file.name}`;
   const storageRef = ref(storage, path);
   await uploadBytes(storageRef, file);
   const url = await getDownloadURL(storageRef);
