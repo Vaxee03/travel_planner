@@ -1,4 +1,4 @@
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
@@ -34,6 +34,104 @@ function publicTripCopy(trip) {
     })),
   };
 }
+
+// ---- Link previews (KakaoTalk, Slack, SNS…) ----
+// Firebase Hosting routes /share/** and /join/** here (firebase.json) so
+// scrapers, which don't run JavaScript, see a title/description for that
+// specific trip instead of the generic site card. Everyone else gets the
+// exact same app page — only the <!--og:start-->…<!--og:end--> block of the
+// deployed index.html is swapped — and installed PWAs never hit this at all
+// (their service worker answers navigations from cache).
+const SITE_ORIGIN = process.env.FUNCTIONS_EMULATOR === "true"
+  ? "http://127.0.0.1:5000" // the local Hosting emulator
+  : "https://travel-planner-bb32d.web.app";
+const PREVIEW_HOSTS = new Set(["tripplanner.kr", "www.tripplanner.kr", "travel-planner-bb32d.web.app", "travel-planner-bb32d.firebaseapp.com"]);
+let shellCache = { html: null, at: 0 };
+
+async function appShell() {
+  if (shellCache.html && Date.now() - shellCache.at < 5 * 60 * 1000) return shellCache.html;
+  const res = await fetch(`${SITE_ORIGIN}/index.html`, { headers: { "Cache-Control": "no-cache" } });
+  if (!res.ok) throw new Error(`app shell fetch failed: ${res.status}`);
+  shellCache = { html: await res.text(), at: Date.now() };
+  return shellCache.html;
+}
+
+const escapeHtml = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+function previewBlock({ title, description, url, image }) {
+  const t = escapeHtml(title);
+  const d = escapeHtml(description);
+  return [
+    "<!--og:start-->",
+    `<title>${t}</title>`,
+    `<meta name="description" content="${d}" />`,
+    '<meta property="og:type" content="website" />',
+    '<meta property="og:site_name" content="여행 플래너" />',
+    `<meta property="og:title" content="${t}" />`,
+    `<meta property="og:description" content="${d}" />`,
+    `<meta property="og:image" content="${escapeHtml(image)}" />`,
+    '<meta property="og:image:width" content="1200" />',
+    '<meta property="og:image:height" content="630" />',
+    `<meta property="og:url" content="${escapeHtml(url)}" />`,
+    '<meta name="twitter:card" content="summary_large_image" />',
+    "<!--og:end-->",
+  ].join("\n    ");
+}
+
+const tripDates = (t) => [t.startDate, t.endDate].filter(Boolean).join(" ~ ");
+
+async function previewFor(path) {
+  const share = path.match(/^\/share\/([0-9a-f]{32})\/?$/);
+  if (share) {
+    const snap = await db.collection("trips").where("publicShareId", "==", share[1]).limit(1).get();
+    if (snap.empty) return null;
+    const t = snap.docs[0].data();
+    const days = (t.days || []).length;
+    return {
+      title: `${t.title || "여행"} · 공유 일정`,
+      description: [t.destination, tripDates(t), days ? `${days}일 일정` : ""].filter(Boolean).join(" · "),
+    };
+  }
+  // Invite links only reveal what the invite itself implies: the trip's
+  // name, where/when, and who's inviting — no members, budget or plans.
+  const join = path.match(/^\/join\/([A-Za-z0-9]{10,40})\/?$/);
+  if (join) {
+    const snap = await db.doc(`trips/${join[1]}`).get();
+    if (!snap.exists) return null;
+    const t = snap.data();
+    const owner = t.ownerId ? await db.doc(`users/${t.ownerId}`).get() : null;
+    const nickname = owner?.exists ? owner.data().nickname : "";
+    return {
+      title: `${nickname || "동행자"}님이 '${t.title || "여행"}'에 초대했어요`,
+      description: [t.destination, tripDates(t), "여행 플래너에서 함께 계획해요"].filter(Boolean).join(" · "),
+    };
+  }
+  return null;
+}
+
+exports.ogPage = onRequest({ region: "us-central1" }, async (req, res) => {
+  const forwarded = String(req.get("x-forwarded-host") || "").split(",")[0].trim();
+  const host = PREVIEW_HOSTS.has(forwarded) ? forwarded : "tripplanner.kr";
+  const origin = `https://${host}`;
+  let html;
+  try {
+    html = await appShell();
+  } catch (err) {
+    console.error("ogPage shell", err);
+    res.status(503).set("Retry-After", "5").send("잠시 후 다시 시도해주세요.");
+    return;
+  }
+  try {
+    const meta = await previewFor(req.path);
+    if (meta) {
+      html = html.replace(/<!--og:start-->[\s\S]*?<!--og:end-->/, previewBlock({ ...meta, url: origin + req.path, image: `${origin}/og.jpg` }));
+    }
+  } catch (err) {
+    console.error("ogPage preview", err); // fall back to the generic card
+  }
+  res.set("Cache-Control", "public, max-age=0, s-maxage=300");
+  res.status(200).send(html);
+});
 
 // Client-side error reports (src/lib/errorReporting.js). Written to Cloud
 // Logging as structured entries, readable with
