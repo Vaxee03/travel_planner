@@ -318,6 +318,9 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit }
     onSubmit(modal, formValues(e.target));
   }
 
+  // Edit forms prefill from the trip as it was when they opened (see
+  // openModal in App.jsx), not the live one that other members keep changing.
+  const seenTrip = modal.tripAtOpen || trip;
   let content = null;
 
   if (modal.type === "confirm") {
@@ -357,7 +360,7 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit }
     );
   } else if (modal.type === "add-day" || modal.type === "edit-day") {
     const isEdit = modal.type === "edit-day";
-    const d = isEdit ? trip.days[modal.idx] : { date: "", status: "open", summary: "" };
+    const d = isEdit ? seenTrip.days[modal.idx] : { date: "", status: "open", summary: "" };
     content = (
       <form onSubmit={handleSubmit} noValidate>
         <h3>{isEdit ? "날짜 수정" : "날짜 추가"}</h3>
@@ -376,11 +379,11 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit }
     );
   } else if (modal.type === "add-item" || modal.type === "edit-item") {
     const isEdit = modal.type === "edit-item";
-    const it = isEdit ? trip.days[modal.dayIdx].items[modal.idx] : { time: "", text: "" };
+    const it = isEdit ? seenTrip.days[modal.dayIdx].items[modal.idx] : { time: "", text: "" };
     content = <ItemForm isEdit={isEdit} it={it} destination={trip.destination} onSubmit={handleSubmit} onClose={onClose} />;
   } else if (modal.type === "add-budget" || modal.type === "edit-budget") {
     const isEdit = modal.type === "edit-budget";
-    const b = isEdit ? trip.budgetItems[modal.idx] : { category: "", amount: "", memo: "" };
+    const b = isEdit ? seenTrip.budgetItems[modal.idx] : { category: "", amount: "", memo: "" };
     content = (
       <form onSubmit={handleSubmit} noValidate>
         <h3>{isEdit ? "지출 항목 수정" : "지출 항목 추가"}</h3>
@@ -405,7 +408,7 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit }
   } else if (modal.type === "add-booking" || modal.type === "edit-booking") {
     const isEdit = modal.type === "edit-booking";
     const isDomestic = trip.tripType === "domestic";
-    const b = isEdit ? trip.bookings[modal.idx] : { type: isDomestic ? "교통" : "항공권", name: "", confirmNumber: "", link: "", memo: "" };
+    const b = isEdit ? seenTrip.bookings[modal.idx] : { type: isDomestic ? "교통" : "항공권", name: "", confirmNumber: "", link: "", memo: "" };
     content = (
       <form onSubmit={handleSubmit} noValidate>
         <h3>{isEdit ? "예약 정보 수정" : "예약 정보 추가"}</h3>
@@ -436,7 +439,7 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit }
   } else if (modal.type === "delete-account") {
     content = <DeleteAccountForm modal={modal} onSubmit={onSubmit} onClose={onClose} />;
   } else if (modal.type === "add-restaurant") {
-    content = <RestaurantItemForm trip={trip} restaurant={modal.restaurant} onSubmit={handleSubmit} onClose={onClose} />;
+    content = <RestaurantItemForm trip={seenTrip} restaurant={modal.restaurant} onSubmit={handleSubmit} onClose={onClose} />;
   } else if (modal.type === "share-link") {
     content = <ShareLinkForm trip={trip} onSubmit={onSubmit} onClose={onClose} />;
   } else if (modal.type === "view-route") {

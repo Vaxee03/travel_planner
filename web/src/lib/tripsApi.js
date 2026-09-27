@@ -3,8 +3,8 @@
 // REST calls to a real backend later shouldn't require touching any component.
 
 import {
-  collection, doc, onSnapshot, setDoc, addDoc, deleteDoc, updateDoc,
-  arrayUnion, arrayRemove, deleteField, serverTimestamp, query, where,
+  collection, doc, onSnapshot, addDoc, deleteDoc, updateDoc,
+  arrayUnion, arrayRemove, deleteField, serverTimestamp, query, where, runTransaction,
 } from "firebase/firestore";
 import {
   ref, uploadBytes, getDownloadURL, deleteObject,
@@ -40,9 +40,39 @@ export async function createTrip(uid, fields) {
   return ref_.id;
 }
 
-export function saveTrip(trip) {
-  const { id, ...data } = trip;
-  return setDoc(doc(db, "trips", id), data);
+const isPlainData = (v) => Array.isArray(v) || (v !== null && typeof v === "object" && Object.getPrototypeOf(v) === Object.prototype);
+
+/** Applies `mutate(draft)` to the trip's *latest server copy* inside a
+ * transaction and writes back only the top-level fields it changed.
+ *
+ * This replaces the old "clone my local snapshot, edit, setDoc the whole
+ * trip" pattern, which silently dropped another member's edit made in the
+ * meantime (last write wins over the whole document). Here Firestore reruns
+ * `mutate` on fresh data if someone else wrote first, and untouched fields
+ * are never rewritten — so they also keep their stored types (the old
+ * pattern turned createdAt's Timestamp into a plain map on every save).
+ *
+ * `mutate` may run more than once, so it must only edit the draft.
+ * Needs a connection (transactions don't queue offline). */
+export function mutateTrip(tripId, mutate) {
+  const ref_ = doc(db, "trips", tripId);
+  return runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref_);
+    if (!snap.exists()) throw new Error("trip-not-found");
+    const current = snap.data();
+    // Deep-copy only plain data; class instances (Timestamp) stay as-is so
+    // they compare equal and never get rewritten.
+    const draft = Object.fromEntries(
+      Object.entries(current).map(([k, v]) => [k, isPlainData(v) ? structuredClone(v) : v])
+    );
+    mutate(draft);
+    const changes = {};
+    for (const k of new Set([...Object.keys(current), ...Object.keys(draft)])) {
+      if (!(k in draft)) changes[k] = deleteField();
+      else if (JSON.stringify(draft[k]) !== JSON.stringify(current[k])) changes[k] = draft[k];
+    }
+    if (Object.keys(changes).length) tx.update(ref_, changes);
+  });
 }
 
 export function deleteTrip(tripId) {
@@ -63,19 +93,17 @@ export function removeMember(tripId, uid) {
   });
 }
 
-/** A targeted field update (not the usual read-whole-trip/mutate/saveTrip
- * pattern) so that toggling a checklist box — the one action every member is
- * always allowed to do regardless of permissions — can never get rejected by
- * the security rules just because some other unrelated field in this
- * member's local trip snapshot happened to be stale relative to the server. */
+/** A single-field update (not a mutateTrip transaction) so toggling a
+ * checklist box — the one action every member is always allowed to do
+ * regardless of permissions — is instant, works offline, and only ever
+ * touches checklistDone. */
 export function setChecklistDone(tripId, itemId, done) {
   return updateDoc(doc(db, "trips", tripId), { [`checklistDone.${itemId}`]: done });
 }
 
-/** Turns the public share link on (a new random id) or off. A targeted
- * one-field update rather than the usual clone-and-saveTrip, so a stale or
- * odd local copy of the rest of the trip can't make it fail. Resolves the
- * new id (or null when turned off). */
+/** Turns the public share link on (a new random id) or off — a single-field
+ * update that never touches the rest of the trip. Resolves the new id (or
+ * null when turned off). */
 export async function setPublicShareId(tripId, on) {
   const shareId = on ? randomShareId() : null;
   await updateDoc(doc(db, "trips", tripId), { publicShareId: on ? shareId : deleteField() });

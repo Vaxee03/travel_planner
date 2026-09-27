@@ -36,6 +36,41 @@ export function defaultChecklist(tripType) {
   return items.map((text) => ({ id: makeChecklistId(), text }));
 }
 
+/** JSON with object keys sorted, so two copies of the same data compare
+ * equal no matter what key order Firestore decoded them in. */
+export function stableStringify(v) {
+  if (Array.isArray(v)) return `[${v.map(stableStringify).join(",")}]`;
+  if (v && typeof v === "object") {
+    return `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${stableStringify(v[k])}`).join(",")}}`;
+  }
+  return JSON.stringify(v);
+}
+
+/** Thrown when the item a user acted on no longer exists in the latest data
+ * (another member deleted or changed it first). */
+export class StaleEditError extends Error {
+  constructor() { super("stale-edit"); this.name = "StaleEditError"; }
+}
+
+/** Index of `expected` (the item as the user saw it) in the latest `list`:
+ * its old position if it's still there, otherwise wherever it moved to.
+ * Throws StaleEditError if it's gone. */
+export function locateItem(list, idx, expected) {
+  const key = stableStringify(expected);
+  if (list?.[idx] !== undefined && stableStringify(list[idx]) === key) return idx;
+  const found = (list || []).findIndex((x) => stableStringify(x) === key);
+  if (found < 0) throw new StaleEditError();
+  return found;
+}
+
+/** Index of the day with this date in the latest days list (days are kept
+ * one per date and sorted, so the date identifies a day). */
+export function locateDay(days, date) {
+  const found = (days || []).findIndex((d) => d.date === date);
+  if (found < 0) throw new StaleEditError();
+  return found;
+}
+
 /** A checklist carried over into another trip: fresh ids, and no 담당자 —
  * the other trip's members aren't necessarily the same people. */
 export function copyChecklist(items) {

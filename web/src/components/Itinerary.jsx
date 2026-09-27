@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { fmtDate, mapUrl, splitItems } from "../lib/utils";
-import { saveTrip } from "../lib/tripsApi";
+import { mutateTrip } from "../lib/tripsApi";
 import { routeStops } from "./RouteMapViewer";
 
 export default function Itinerary({ trip, dayIdx, setDayIdx, openModal, requestDelete, reorderDayItems, canEdit }) {
@@ -80,7 +80,7 @@ function ItineraryMemo({ trip, canEdit }) {
     if (text === (trip.itineraryMemo || "")) return;
     setSaving(true);
     try {
-      await saveTrip({ ...trip, itineraryMemo: text });
+      await mutateTrip(trip.id, (t) => { t.itineraryMemo = text; });
     } finally {
       setSaving(false);
     }

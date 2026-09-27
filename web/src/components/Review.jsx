@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { uploadReviewPhoto, deleteReviewPhoto, saveTrip } from "../lib/tripsApi";
+import { uploadReviewPhoto, deleteReviewPhoto, mutateTrip } from "../lib/tripsApi";
 import { useNicknames } from "../lib/useNicknames";
 import { DEFAULT_NICKNAME } from "../lib/users";
 
@@ -30,12 +30,12 @@ export default function Review({ trip, uid, canReview, openModal, requestDelete 
     setError(null);
     try {
       const { url, path } = await uploadReviewPhoto(trip.id, uid, file);
-      const t = structuredClone(trip);
-      t.reviews = t.reviews || [];
-      const idx = t.reviews.findIndex((r) => r.authorId === uid);
-      if (idx >= 0) t.reviews[idx].photos = [...(t.reviews[idx].photos || []), { url, path }];
-      else t.reviews.push({ authorId: uid, text: "", photos: [{ url, path }], updatedAt: Date.now() });
-      await saveTrip(t);
+      await mutateTrip(trip.id, (t) => {
+        t.reviews = t.reviews || [];
+        const idx = t.reviews.findIndex((r) => r.authorId === uid);
+        if (idx >= 0) t.reviews[idx].photos = [...(t.reviews[idx].photos || []), { url, path }];
+        else t.reviews.push({ authorId: uid, text: "", photos: [{ url, path }], updatedAt: Date.now() });
+      });
     } catch (err) {
       setError("사진 업로드에 실패했어요: " + (err?.message || "알 수 없는 오류"));
     } finally {
@@ -45,11 +45,11 @@ export default function Review({ trip, uid, canReview, openModal, requestDelete 
   }
 
   async function handleDeletePhoto(photo) {
-    const t = structuredClone(trip);
-    const idx = t.reviews.findIndex((r) => r.authorId === uid);
-    if (idx < 0) return;
-    t.reviews[idx].photos = t.reviews[idx].photos.filter((p) => p.path !== photo.path);
-    await saveTrip(t);
+    await mutateTrip(trip.id, (t) => {
+      const idx = (t.reviews || []).findIndex((r) => r.authorId === uid);
+      if (idx < 0) return;
+      t.reviews[idx].photos = (t.reviews[idx].photos || []).filter((p) => p.path !== photo.path);
+    });
     deleteReviewPhoto(photo.path);
   }
 

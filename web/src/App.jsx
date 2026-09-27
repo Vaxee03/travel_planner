@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, matchPath, useLocation, useNavigate } from "react-router-dom";
 import { firebaseReady, watchAuth, signOutUser, deleteMyAccount } from "./lib/firebase";
-import { subscribeTrips, createTrip, saveTrip, deleteTrip, joinTrip, removeMember, setChecklistDone, setPublicShareId } from "./lib/tripsApi";
+import { subscribeTrips, createTrip, mutateTrip, deleteTrip, joinTrip, removeMember, setChecklistDone, setPublicShareId } from "./lib/tripsApi";
 import { fetchNickname, setNickname } from "./lib/users";
 import { randomNickname } from "./lib/randomNickname";
-import { checklistItemId, copyChecklist, daysBetween, ensureChecklistIds, makeChecklistId, shiftDate } from "./lib/utils";
+import {
+  checklistItemId, copyChecklist, daysBetween, ensureChecklistIds, makeChecklistId, shiftDate,
+  locateDay, locateItem, stableStringify, StaleEditError,
+} from "./lib/utils";
 import { computePerms, PERMISSION_CATEGORIES } from "./lib/permissions";
 import Home from "./components/Home";
 import TripDetail from "./components/TripDetail";
@@ -125,11 +128,14 @@ export default function App() {
   function setTab(key) {
     navigate(`/trip/${tripId}/${key}`);
   }
-  function openModal(m) { setModal(m); }
+  // Forms that act on an existing item remember the trip as it was when they
+  // opened: the live trip keeps updating from other members' edits, so
+  // "item #idx" could otherwise point at a different item by submit time.
+  function openModal(m) { setModal({ ...m, tripAtOpen: trip }); }
   function closeModal() { setModal(null); }
 
   function requestDelete(onYes, message, extra) {
-    setModal({ type: "confirm", onYes, message, ...extra });
+    setModal({ type: "confirm", onYes, message, ...extra, tripAtOpen: trip });
   }
 
   async function handleJoinByCode(code) {
@@ -137,10 +143,9 @@ export default function App() {
     openTrip(code);
   }
 
-  // A targeted field update (not the usual clone-whole-trip-and-saveTrip
-  // pattern), so this stays allowed for every member regardless of checklist
-  // permission and can't get caught up in an unrelated stale-field conflict
-  // (see setChecklistDone's doc comment).
+  // A targeted single-field update rather than a mutateTrip transaction, so
+  // it works offline too and stays allowed for every member regardless of
+  // checklist permission (see setChecklistDone's doc comment).
   function toggleCheck(idx) {
     const item = trip.checklist[idx];
     const id = checklistItemId(item, idx);
@@ -149,12 +154,34 @@ export default function App() {
   }
 
   function reorderDayItems(dayIdx, newItems) {
-    const t = structuredClone(trip);
-    t.days[dayIdx].items = newItems;
-    saveTrip(t);
+    const seen = trip.days[dayIdx];
+    runMutation(() => mutateTrip(tripId, (t) => {
+      const day = t.days[locateDay(t.days, seen.date)];
+      // Only a pure reorder of the items the user was looking at — if someone
+      // added/removed/edited one meanwhile, don't overwrite their change.
+      const sortedKeys = (items) => (items || []).map(stableStringify).sort().join("|");
+      if (sortedKeys(day.items) !== sortedKeys(seen.items)) throw new StaleEditError();
+      day.items = newItems;
+    }));
+  }
+
+  // Runs a trip write; if the item the user acted on was already changed or
+  // deleted by another member, says so instead of failing silently.
+  async function runMutation(fn) {
+    try {
+      await fn();
+    } catch (err) {
+      if (err instanceof StaleEditError) {
+        window.alert("다른 동행자가 이 항목을 먼저 바꿨어요. 화면이 최신 내용으로 바뀌었으니 확인 후 다시 시도해주세요.");
+        return false;
+      }
+      throw err;
+    }
+    return true;
   }
 
   async function handleModalSubmit(m, values) {
+    const seenTrip = m.tripAtOpen || trip;
     if (m.type === "confirm") {
       if (m.onYes === "delete-trip") {
         await deleteTrip(tripId);
@@ -165,32 +192,41 @@ export default function App() {
         await removeMember(tripId, user.uid);
         navigate("/", { replace: true });
       } else if (m.onYes === "delete-day") {
-        const t = structuredClone(trip);
-        t.days.splice(m.idx, 1);
-        await saveTrip(t);
+        const date = seenTrip.days[m.idx].date;
+        await runMutation(() => mutateTrip(tripId, (t) => {
+          t.days.splice(locateDay(t.days, date), 1);
+        }));
         setDayIdx(null);
       } else if (m.onYes === "delete-item") {
-        const t = structuredClone(trip);
-        t.days[m.dayIdx].items.splice(m.idx, 1);
-        await saveTrip(t);
+        const seenDay = seenTrip.days[m.dayIdx];
+        const seenItem = seenDay.items[m.idx];
+        await runMutation(() => mutateTrip(tripId, (t) => {
+          const day = t.days[locateDay(t.days, seenDay.date)];
+          day.items.splice(locateItem(day.items, m.idx, seenItem), 1);
+        }));
       } else if (m.onYes === "delete-budget") {
-        const t = structuredClone(trip);
-        t.budgetItems.splice(m.idx, 1);
-        await saveTrip(t);
+        const seen = seenTrip.budgetItems[m.idx];
+        await runMutation(() => mutateTrip(tripId, (t) => {
+          t.budgetItems.splice(locateItem(t.budgetItems, m.idx, seen), 1);
+        }));
       } else if (m.onYes === "delete-check") {
-        const t = structuredClone(trip);
-        const id = checklistItemId(t.checklist[m.idx], m.idx);
-        t.checklist.splice(m.idx, 1);
-        if (t.checklistDone) delete t.checklistDone[id];
-        await saveTrip(t);
+        const seen = seenTrip.checklist[m.idx];
+        const seenId = checklistItemId(seen, m.idx);
+        await runMutation(() => mutateTrip(tripId, (t) => {
+          const idx = seen.id ? t.checklist.findIndex((c) => c.id === seen.id) : locateItem(t.checklist, m.idx, seen);
+          if (idx < 0) throw new StaleEditError();
+          t.checklist.splice(idx, 1);
+          if (t.checklistDone) delete t.checklistDone[seenId];
+        }));
       } else if (m.onYes === "delete-booking") {
-        const t = structuredClone(trip);
-        t.bookings.splice(m.idx, 1);
-        await saveTrip(t);
+        const seen = seenTrip.bookings[m.idx];
+        await runMutation(() => mutateTrip(tripId, (t) => {
+          t.bookings.splice(locateItem(t.bookings, m.idx, seen), 1);
+        }));
       } else if (m.onYes === "delete-review") {
-        const t = structuredClone(trip);
-        t.reviews = (t.reviews || []).filter((r) => r.authorId !== m.authorId);
-        await saveTrip(t);
+        await mutateTrip(tripId, (t) => {
+          t.reviews = (t.reviews || []).filter((r) => r.authorId !== m.authorId);
+        });
       }
       closeModal();
       return;
@@ -206,15 +242,15 @@ export default function App() {
       return;
     }
     if (m.type === "manage-permissions") {
-      const t = structuredClone(trip);
-      const memberIds = (t.memberIds || []).filter((id) => id !== t.ownerId);
-      const next = {};
-      memberIds.forEach((id) => {
-        const cats = PERMISSION_CATEGORIES.filter((c) => values[`perm_${id}_${c.key}`] === "on").map((c) => c.key);
-        if (cats.length) next[id] = cats;
+      await mutateTrip(tripId, (t) => {
+        const memberIds = (t.memberIds || []).filter((id) => id !== t.ownerId);
+        const next = {};
+        memberIds.forEach((id) => {
+          const cats = PERMISSION_CATEGORIES.filter((c) => values[`perm_${id}_${c.key}`] === "on").map((c) => c.key);
+          if (cats.length) next[id] = cats;
+        });
+        t.memberPermissions = next;
       });
-      t.memberPermissions = next;
-      await saveTrip(t);
       closeModal();
       return;
     }
@@ -231,12 +267,12 @@ export default function App() {
       return;
     }
     if (m.type === "transfer-ownership") {
-      const t = structuredClone(trip);
-      const newOwnerId = values.newOwnerId;
-      if (newOwnerId && (t.memberIds || []).includes(newOwnerId)) {
-        t.ownerId = newOwnerId;
-      }
-      await saveTrip(t);
+      await mutateTrip(tripId, (t) => {
+        const newOwnerId = values.newOwnerId;
+        if (newOwnerId && (t.memberIds || []).includes(newOwnerId)) {
+          t.ownerId = newOwnerId;
+        }
+      });
       closeModal();
       return;
     }
@@ -277,106 +313,112 @@ export default function App() {
       return;
     }
     if (m.type === "edit-trip") {
-      const t = structuredClone(trip);
-      t.title = values.title; t.destination = values.destination;
-      t.startDate = values.startDate; t.endDate = values.endDate;
-      t.travelers = Number(values.travelers) || 1;
-      t.budgetTotal = Number(values.budgetTotal) || 0;
-      t.tripType = values.tripType === "domestic" ? "domestic" : "international";
-      await saveTrip(t);
+      await mutateTrip(tripId, (t) => {
+        t.title = values.title; t.destination = values.destination;
+        t.startDate = values.startDate; t.endDate = values.endDate;
+        t.travelers = Number(values.travelers) || 1;
+        t.budgetTotal = Number(values.budgetTotal) || 0;
+        t.tripType = values.tripType === "domestic" ? "domestic" : "international";
+      });
       closeModal();
       return;
     }
     if (m.type === "add-day") {
-      const t = structuredClone(trip);
-      t.days = t.days || [];
-      t.days.push({ date: values.date, status: values.status, summary: values.summary, items: [] });
-      t.days.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-      await saveTrip(t);
+      await mutateTrip(tripId, (t) => {
+        t.days = t.days || [];
+        t.days.push({ date: values.date, status: values.status, summary: values.summary, items: [] });
+        t.days.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+      });
       closeModal();
       return;
     }
     if (m.type === "edit-day") {
-      const t = structuredClone(trip);
-      const d = t.days[m.idx];
-      d.date = values.date; d.status = values.status; d.summary = values.summary;
-      t.days.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-      await saveTrip(t);
+      const date = seenTrip.days[m.idx].date;
+      await runMutation(() => mutateTrip(tripId, (t) => {
+        const d = t.days[locateDay(t.days, date)];
+        d.date = values.date; d.status = values.status; d.summary = values.summary;
+        t.days.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+      }));
       closeModal();
       return;
     }
     if (m.type === "add-item" || m.type === "edit-item" || m.type === "add-restaurant") {
-      const t = structuredClone(trip);
-      const dayIdx = m.type === "add-restaurant" ? Number(values.dayIdx) || 0 : m.dayIdx;
-      const day = t.days[dayIdx];
-      day.items = day.items || [];
-      const kind = values.kind === "label" ? "label" : "time";
-      const item = {
-        kind,
-        time: kind === "time" ? values.timeValue : values.labelValue,
-        text: values.text,
-      };
-      if (values.locationJson) item.location = JSON.parse(values.locationJson);
-      // Tags the item with the recommendation it came from, so the 맛집 tab
-      // can show "✓ 일정에 추가됨" even if the user renamed the item.
-      if (m.type === "add-restaurant") item.restaurant = m.restaurant.name;
-      else if (m.type === "edit-item" && day.items[m.idx]?.restaurant) item.restaurant = day.items[m.idx].restaurant;
-      if (m.type === "edit-item") day.items[m.idx] = item;
-      else day.items.push(item);
-      await saveTrip(t);
+      const seenDay = seenTrip.days[m.type === "add-restaurant" ? Number(values.dayIdx) || 0 : m.dayIdx];
+      const seenItem = m.type === "edit-item" ? seenDay.items[m.idx] : null;
+      await runMutation(() => mutateTrip(tripId, (t) => {
+        const day = t.days[locateDay(t.days, seenDay.date)];
+        day.items = day.items || [];
+        const itemIdx = seenItem ? locateItem(day.items, m.idx, seenItem) : -1;
+        const kind = values.kind === "label" ? "label" : "time";
+        const item = {
+          kind,
+          time: kind === "time" ? values.timeValue : values.labelValue,
+          text: values.text,
+        };
+        if (values.locationJson) item.location = JSON.parse(values.locationJson);
+        // Tags the item with the recommendation it came from, so the 맛집 tab
+        // can show "✓ 일정에 추가됨" even if the user renamed the item.
+        if (m.type === "add-restaurant") item.restaurant = m.restaurant.name;
+        else if (seenItem?.restaurant) item.restaurant = seenItem.restaurant;
+        if (seenItem) day.items[itemIdx] = item;
+        else day.items.push(item);
+      }));
       closeModal();
       return;
     }
     if (m.type === "add-budget" || m.type === "edit-budget") {
-      const t = structuredClone(trip);
-      t.budgetItems = t.budgetItems || [];
-      const prev = m.type === "edit-budget" ? t.budgetItems[m.idx] : { createdBy: user.uid };
-      const item = { ...prev, category: values.category, amount: Number(values.amount) || 0, memo: values.memo };
-      // The split fields only exist on a multi-member trip. The split list is
-      // stored explicitly (not "everyone") so someone who joins later isn't
-      // retroactively charged for costs from before they joined.
-      if ((t.memberIds || []).length > 1) {
-        const split = t.memberIds.filter((id) => values[`split_${id}`] === "on");
-        item.splitAmong = split.length ? split : [...t.memberIds];
-        if (values.paidBy) item.paidBy = values.paidBy;
-        else delete item.paidBy;
-      }
-      if (m.type === "add-budget") t.budgetItems.push(item);
-      else t.budgetItems[m.idx] = item;
-      await saveTrip(t);
+      const seen = m.type === "edit-budget" ? seenTrip.budgetItems[m.idx] : null;
+      await runMutation(() => mutateTrip(tripId, (t) => {
+        t.budgetItems = t.budgetItems || [];
+        const itemIdx = seen ? locateItem(t.budgetItems, m.idx, seen) : -1;
+        const prev = seen ? t.budgetItems[itemIdx] : { createdBy: user.uid };
+        const item = { ...prev, category: values.category, amount: Number(values.amount) || 0, memo: values.memo };
+        // The split fields only exist on a multi-member trip. The split list is
+        // stored explicitly (not "everyone") so someone who joins later isn't
+        // retroactively charged for costs from before they joined.
+        if ((t.memberIds || []).length > 1) {
+          const split = t.memberIds.filter((id) => values[`split_${id}`] === "on");
+          item.splitAmong = split.length ? split : [...t.memberIds];
+          if (values.paidBy) item.paidBy = values.paidBy;
+          else delete item.paidBy;
+        }
+        if (seen) t.budgetItems[itemIdx] = item;
+        else t.budgetItems.push(item);
+      }));
       closeModal();
       return;
     }
     if (m.type === "add-check") {
-      const t = structuredClone(trip);
-      // Backfill ids onto any pre-existing legacy items in the same write —
-      // this write already requires checklist permission, so it's a free
-      // opportunity to migrate the trip off the position-based fallback id.
-      t.checklist = ensureChecklistIds(t.checklist);
-      const checkItem = { id: makeChecklistId(), text: values.text };
-      if (values.assignedTo) checkItem.assignedTo = values.assignedTo;
-      t.checklist.push(checkItem);
-      await saveTrip(t);
+      await mutateTrip(tripId, (t) => {
+        // Backfill ids onto any pre-existing legacy items in the same write —
+        // this write already requires checklist permission, so it's a free
+        // opportunity to migrate the trip off the position-based fallback id.
+        t.checklist = ensureChecklistIds(t.checklist);
+        const checkItem = { id: makeChecklistId(), text: values.text };
+        if (values.assignedTo) checkItem.assignedTo = values.assignedTo;
+        t.checklist.push(checkItem);
+      });
       closeModal();
       return;
     }
     if (m.type === "add-booking" || m.type === "edit-booking") {
-      const t = structuredClone(trip);
-      t.bookings = t.bookings || [];
-      const booking = { type: values.type, name: values.name, confirmNumber: values.confirmNumber, link: values.link, memo: values.memo };
-      if (m.type === "add-booking") t.bookings.push(booking);
-      else t.bookings[m.idx] = booking;
-      await saveTrip(t);
+      const seen = m.type === "edit-booking" ? seenTrip.bookings[m.idx] : null;
+      await runMutation(() => mutateTrip(tripId, (t) => {
+        t.bookings = t.bookings || [];
+        const booking = { type: values.type, name: values.name, confirmNumber: values.confirmNumber, link: values.link, memo: values.memo };
+        if (seen) t.bookings[locateItem(t.bookings, m.idx, seen)] = booking;
+        else t.bookings.push(booking);
+      }));
       closeModal();
       return;
     }
     if (m.type === "edit-review") {
-      const t = structuredClone(trip);
-      t.reviews = t.reviews || [];
-      const idx = t.reviews.findIndex((r) => r.authorId === user.uid);
-      if (idx >= 0) t.reviews[idx] = { ...t.reviews[idx], text: values.text, updatedAt: Date.now() };
-      else t.reviews.push({ authorId: user.uid, text: values.text, photos: [], updatedAt: Date.now() });
-      await saveTrip(t);
+      await mutateTrip(tripId, (t) => {
+        t.reviews = t.reviews || [];
+        const idx = t.reviews.findIndex((r) => r.authorId === user.uid);
+        if (idx >= 0) t.reviews[idx] = { ...t.reviews[idx], text: values.text, updatedAt: Date.now() };
+        else t.reviews.push({ authorId: user.uid, text: values.text, photos: [], updatedAt: Date.now() });
+      });
       closeModal();
       return;
     }
