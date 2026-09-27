@@ -4,6 +4,10 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Identifies which deploy a reported client error came from.
+  define: {
+    __APP_RELEASE__: JSON.stringify(new Date().toISOString().slice(0, 16)),
+  },
   plugins: [
     react(),
     VitePWA({

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { fetchRestaurantRecommendations } from "../lib/recommendations";
 import { fmtDate } from "../lib/utils";
 import InfoTooltip from "./InfoTooltip";
+import { reportError } from "../lib/errorReporting";
 
 /** Dates of the days that already hold an item added from this
  * recommendation (tagged with `restaurant` when it was added). */
@@ -25,6 +26,8 @@ export default function Restaurants({ trip, openModal, canAddToItinerary }) {
     try {
       setRec(await fetchRestaurantRecommendations(trip.destination, preferences, trip.tripType));
     } catch (err) {
+      // Hitting the daily limit is expected, not a bug worth reporting.
+      if (err?.code !== "functions/resource-exhausted") reportError(err, "restaurant-recs");
       setError(err?.message || "맛집 추천을 가져오지 못했어요.");
     } finally {
       setLoading(false);

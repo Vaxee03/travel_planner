@@ -35,6 +35,37 @@ function publicTripCopy(trip) {
   };
 }
 
+// Client-side error reports (src/lib/errorReporting.js). Written to Cloud
+// Logging as structured entries, readable with
+//   npx firebase-tools@13 functions:log --only logClientError
+// Callable signed out too (errors can happen before login); every field is
+// truncated and each server instance drops floods from a single caller.
+const recentReports = new Map(); // caller → { windowStart, count }
+exports.logClientError = onCall({ region: "us-central1" }, async (request) => {
+  const caller = request.auth?.uid || request.rawRequest?.ip || "anon";
+  const now = Date.now();
+  const entry = recentReports.get(caller);
+  if (!entry || now - entry.windowStart > 60_000) recentReports.set(caller, { windowStart: now, count: 1 });
+  else if (++entry.count > 10) return { dropped: true };
+  if (recentReports.size > 5000) recentReports.clear();
+
+  const cut = (v, n) => String(v ?? "").slice(0, n);
+  const d = request.data || {};
+  console.error(JSON.stringify({
+    severity: "ERROR",
+    message: `[client] ${cut(d.message, 300)}`,
+    where: cut(d.where, 80),
+    name: cut(d.name, 80),
+    code: cut(d.code, 80),
+    stack: cut(d.stack, 3000),
+    url: cut(d.url, 300),
+    userAgent: cut(d.userAgent, 300),
+    release: cut(d.release, 40),
+    uid: request.auth?.uid || null,
+  }));
+  return { ok: true };
+});
+
 // /share/:shareId — looks the trip up by its public link id on every view
 // and returns just the itinerary. Callable without sign-in; the id is a
 // random 32-hex string only the 방장 hands out, and turning the link off

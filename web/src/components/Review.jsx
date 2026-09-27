@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { uploadReviewPhoto, deleteReviewPhoto, mutateTrip } from "../lib/tripsApi";
 import { useNicknames } from "../lib/useNicknames";
+import { reportError } from "../lib/errorReporting";
 import { DEFAULT_NICKNAME } from "../lib/users";
 
 export default function Review({ trip, uid, canReview, openModal, requestDelete }) {
@@ -37,6 +38,7 @@ export default function Review({ trip, uid, canReview, openModal, requestDelete 
         else t.reviews.push({ authorId: uid, text: "", photos: [{ url, path }], updatedAt: Date.now() });
       });
     } catch (err) {
+      reportError(err, "review-photo-upload");
       setError("사진 업로드에 실패했어요: " + (err?.message || "알 수 없는 오류"));
     } finally {
       setUploading(false);

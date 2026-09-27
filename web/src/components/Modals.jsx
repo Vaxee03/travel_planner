@@ -9,6 +9,7 @@ import MapPicker from "./MapPicker";
 import InviteCard from "./InviteCard";
 import LocationViewer from "./LocationViewer";
 import RouteMapViewer from "./RouteMapViewer";
+import { reportError } from "../lib/errorReporting";
 import { useNicknames } from "../lib/useNicknames";
 import { DEFAULT_NICKNAME } from "../lib/users";
 import { PERMISSION_CATEGORIES } from "../lib/permissions";
@@ -167,7 +168,8 @@ function DeleteAccountForm({ modal, onSubmit, onClose }) {
     setError(null);
     try {
       await onSubmit(modal, {});
-    } catch {
+    } catch (err) {
+      reportError(err, "delete-account");
       setError("탈퇴 처리 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.");
       setBusy(false);
     }
@@ -215,7 +217,7 @@ function ShareLinkForm({ trip, onSubmit, onClose }) {
     try {
       await onSubmit({ type: "share-link" }, { action });
     } catch (err) {
-      console.error("[share-link]", err);
+      reportError(err, "share-link");
       const what = action === "on" ? "링크를 만들지 못했어요" : "링크를 끄지 못했어요";
       // Say *why*, so a failure can be told apart from a bug: a blocked or
       // dropped connection (ad blockers often block Firestore) vs. the
