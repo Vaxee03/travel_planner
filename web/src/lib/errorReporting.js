@@ -2,8 +2,7 @@
 // (Cloud Logging), so a failure someone hits in production can be diagnosed
 // without asking them for screenshots. Only active in real deployed builds —
 // local dev and the emulator just keep logging to the console.
-import { httpsCallable } from "firebase/functions";
-import { functions, firebaseReady } from "./firebase";
+import { callFunction, firebaseReady } from "./firebase";
 
 const enabled = import.meta.env.PROD && import.meta.env.VITE_USE_EMULATORS !== "1" && firebaseReady;
 const MAX_PER_SESSION = 20;
@@ -17,7 +16,7 @@ export function reportError(err, where = "") {
   const key = `${where}|${err?.code || ""}|${message}`;
   if (sent.has(key)) return;
   sent.add(key);
-  httpsCallable(functions, "logClientError")({
+  callFunction("logClientError", {
     where,
     message,
     name: err?.name,

@@ -6,11 +6,7 @@ import {
   collection, doc, onSnapshot, addDoc, deleteDoc, updateDoc,
   arrayUnion, arrayRemove, deleteField, serverTimestamp, query, where, runTransaction,
 } from "firebase/firestore";
-import {
-  ref, uploadBytes, getDownloadURL, deleteObject,
-} from "firebase/storage";
-import { httpsCallable } from "firebase/functions";
-import { db, storage, functions } from "./firebase";
+import { db, callFunction, loadStorage } from "./firebase";
 import { emptyTrip } from "./utils";
 
 const tripsCol = () => collection(db, "trips");
@@ -121,8 +117,7 @@ function randomShareId() {
  * turned off or never existed. */
 export async function fetchPublicTrip(shareId) {
   try {
-    const res = await httpsCallable(functions, "getPublicTrip")({ shareId });
-    return res.data;
+    return await callFunction("getPublicTrip", { shareId });
   } catch (err) {
     if (err?.code === "functions/not-found") return null;
     throw err;
@@ -133,12 +128,14 @@ export async function fetchPublicTrip(shareId) {
  * member delete it. */
 export async function uploadReviewPhoto(tripId, uid, file) {
   const path = `trips/${tripId}/review/${uid}/${Date.now()}_${file.name}`;
-  const storageRef = ref(storage, path);
+  const { instance, ref, uploadBytes, getDownloadURL } = await loadStorage();
+  const storageRef = ref(instance, path);
   await uploadBytes(storageRef, file);
   const url = await getDownloadURL(storageRef);
   return { url, path };
 }
 
-export function deleteReviewPhoto(path) {
-  return deleteObject(ref(storage, path)).catch(() => {});
+export async function deleteReviewPhoto(path) {
+  const { instance, ref, deleteObject } = await loadStorage();
+  return deleteObject(ref(instance, path)).catch(() => {});
 }

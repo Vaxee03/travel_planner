@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { fmtDate, mapUrl, splitItems } from "../lib/utils";
+import { fmtDate, mapUrl, routeStops, splitItems } from "../lib/utils";
 import { mutateTrip } from "../lib/tripsApi";
-import { routeStops } from "./RouteMapViewer";
 
 export default function Itinerary({ trip, dayIdx, setDayIdx, openModal, requestDelete, reorderDayItems, canEdit }) {
   const days = trip.days || [];

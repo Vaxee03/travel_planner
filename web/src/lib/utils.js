@@ -149,6 +149,16 @@ export function splitItems(items) {
   return { timeEntries, labelEntries };
 }
 
+/** The day's located items in visiting order — timed items by time first,
+ * then the untimed/label ones in their hand-arranged order (the same order
+ * the day detail screen lists them in). */
+export function routeStops(day) {
+  const { timeEntries, labelEntries } = splitItems(day?.items);
+  return [...timeEntries, ...labelEntries]
+    .map((e) => e.it)
+    .filter((it) => it.location && Number.isFinite(it.location.lat) && Number.isFinite(it.location.lng));
+}
+
 export function truncateCanvasText(ctx, text, maxWidth) {
   if (ctx.measureText(text).width <= maxWidth) return text;
   let t = text;

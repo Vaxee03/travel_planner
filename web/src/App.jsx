@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Link, matchPath, useLocation, useNavigate } from "react-router-dom";
 import { firebaseReady, watchAuth, signOutUser, deleteMyAccount } from "./lib/firebase";
 import { subscribeTrips, createTrip, mutateTrip, deleteTrip, joinTrip, removeMember, setChecklistDone, setPublicShareId } from "./lib/tripsApi";
@@ -10,11 +10,16 @@ import {
 } from "./lib/utils";
 import { computePerms, PERMISSION_CATEGORIES } from "./lib/permissions";
 import Home from "./components/Home";
-import TripDetail from "./components/TripDetail";
-import ModalHost from "./components/Modals";
 import AuthGate from "./components/AuthGate";
-import PublicTripView from "./components/PublicTripView";
-import { TermsPage, PrivacyPage } from "./components/LegalPage";
+
+// Loaded on demand so the first screen (login / trip list) doesn't have to
+// download the trip page, every form and the Google Maps library up front.
+const loadModals = () => import("./components/Modals");
+const TripDetail = lazy(() => import("./components/TripDetail"));
+const ModalHost = lazy(loadModals);
+const PublicTripView = lazy(() => import("./components/PublicTripView"));
+const TermsPage = lazy(() => import("./components/LegalPage").then((m) => ({ default: m.TermsPage })));
+const PrivacyPage = lazy(() => import("./components/LegalPage").then((m) => ({ default: m.PrivacyPage })));
 
 const TAB_KEYS = ["itinerary", "budget", "checklist", "bookings", "restaurants", "review"];
 
@@ -68,6 +73,15 @@ export default function App() {
     prevUidRef.current = uid;
     if (prev && prev !== uid) navigate("/", { replace: true });
   }, [user, navigate]);
+
+  // Once signed in, fetch the trip page and forms in the background while the
+  // browser is idle, so opening the first trip or form isn't delayed by the
+  // download (they stay out of the initial page load either way).
+  useEffect(() => {
+    if (!user) return;
+    const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 1500));
+    idle(() => { import("./components/TripDetail"); loadModals(); });
+  }, [user]);
 
   // Any other path (typo, old bookmark) just falls back to the trip list.
   const legalPage = location.pathname === "/terms" ? "terms" : location.pathname === "/privacy" ? "privacy" : null;
@@ -445,6 +459,7 @@ export default function App() {
         </div>
       </header>
 
+      <Suspense fallback={<div className="empty">불러오는 중이에요…</div>}>
       {legalPage === "terms" ? (
         <TermsPage />
       ) : legalPage === "privacy" ? (
@@ -488,6 +503,7 @@ export default function App() {
           </div>
         </div>
       )}
+      </Suspense>
 
       <footer className="app-footer">
         {user && <>여행 플래너 · {trips.length}개 여행 관리 중<br /></>}
@@ -498,7 +514,11 @@ export default function App() {
         </span>
       </footer>
 
-      <ModalHost modal={modal} trip={trip} trips={trips} uid={user?.uid} onClose={closeModal} onSubmit={handleModalSubmit} />
+      {modal && (
+        <Suspense fallback={null}>
+          <ModalHost modal={modal} trip={trip} trips={trips} uid={user?.uid} onClose={closeModal} onSubmit={handleModalSubmit} />
+        </Suspense>
+      )}
     </div>
   );
 }

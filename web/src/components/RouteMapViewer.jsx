@@ -1,18 +1,8 @@
 import { GoogleMap, Marker, Polyline, useJsApiLoader } from "@react-google-maps/api";
 import { MAPS_LOADER_OPTIONS } from "../lib/mapsLoader";
-import { splitItems } from "../lib/utils";
+import { routeStops } from "../lib/utils";
 
 const MAP_OPTIONS = { disableDefaultUI: true, zoomControl: true, gestureHandling: "greedy" };
-
-/** The day's located items in visiting order — timed items by time first,
- * then the untimed/label ones in their hand-arranged order (the same order
- * the day detail screen lists them in). */
-export function routeStops(day) {
-  const { timeEntries, labelEntries } = splitItems(day?.items);
-  return [...timeEntries, ...labelEntries]
-    .map((e) => e.it)
-    .filter((it) => it.location && Number.isFinite(it.location.lat) && Number.isFinite(it.location.lng));
-}
 
 /** Read-only map of one day's 동선: numbered pins joined by a line in order. */
 export default function RouteMapViewer({ day, onClose }) {

@@ -1,7 +1,5 @@
 import { initializeApp } from "firebase/app";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, connectFirestoreEmulator } from "firebase/firestore";
-import { getStorage, connectStorageEmulator } from "firebase/storage";
-import { getFunctions, connectFunctionsEmulator, httpsCallable } from "firebase/functions";
 import {
   getAuth, onAuthStateChanged, connectAuthEmulator, signInWithCustomToken, signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -23,7 +21,9 @@ const firebaseConfig = {
 
 export const firebaseReady = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
 
-let app, db, storage, auth, functions;
+const useEmulators = import.meta.env.VITE_USE_EMULATORS === "1";
+
+let app, db, auth;
 if (firebaseReady) {
   app = initializeApp(firebaseConfig);
   // Named Firestore database (Firebase console lets you create one with a
@@ -36,16 +36,12 @@ if (firebaseReady) {
   db = databaseId
     ? initializeFirestore(app, firestoreSettings, databaseId)
     : initializeFirestore(app, firestoreSettings);
-  storage = getStorage(app);
   auth = getAuth(app);
-  functions = getFunctions(app, "us-central1");
   // Local-only: `VITE_USE_EMULATORS=1 npm run dev` points everything at the
   // Firebase emulators (firebase emulators:start) instead of production.
-  if (import.meta.env.VITE_USE_EMULATORS === "1") {
+  if (useEmulators) {
     connectAuthEmulator(auth, "http://127.0.0.1:9299", { disableWarnings: true });
     connectFirestoreEmulator(db, "127.0.0.1", 8080);
-    connectStorageEmulator(storage, "127.0.0.1", 9199);
-    connectFunctionsEmulator(functions, "127.0.0.1", 5001);
     // Test hook: sign in as an arbitrary fake user via an unsigned custom
     // token, which only the Auth emulator accepts. Never exists in prod builds.
     window.__emulatorSignIn = (uid) => {
@@ -64,7 +60,38 @@ if (firebaseReady) {
   );
 }
 
-export { db, storage, auth, functions };
+export { db, auth };
+
+// Cloud Functions and Storage SDKs are only needed for a few actions (AI
+// recs, photos, public links, account deletion, error reports), so they're
+// loaded on first use instead of weighing down the initial page load.
+let functionsModule;
+function loadFunctions() {
+  functionsModule ||= import("firebase/functions").then((m) => {
+    const instance = m.getFunctions(app, "us-central1");
+    if (useEmulators) m.connectFunctionsEmulator(instance, "127.0.0.1", 5001);
+    return { instance, httpsCallable: m.httpsCallable };
+  });
+  return functionsModule;
+}
+
+/** Calls a callable Cloud Function; resolves its `data`. */
+export async function callFunction(name, data) {
+  const { instance, httpsCallable } = await loadFunctions();
+  const res = await httpsCallable(instance, name)(data);
+  return res.data;
+}
+
+let storageModule;
+/** The Storage SDK plus this app's Storage instance, loaded on first use. */
+export function loadStorage() {
+  storageModule ||= import("firebase/storage").then((m) => {
+    const instance = m.getStorage(app);
+    if (useEmulators) m.connectStorageEmulator(instance, "127.0.0.1", 9199);
+    return { ...m, instance };
+  });
+  return storageModule;
+}
 
 /** Subscribes to auth state; fires with the current user (or null) on every change. */
 export function watchAuth(onChange) {
@@ -87,7 +114,7 @@ export function signOutUser() {
 /** 회원 탈퇴 — the deleteAccount function does the cleanup and deletes the
  * Auth account server-side; this just drops the now-dead local session. */
 export async function deleteMyAccount() {
-  await httpsCallable(functions, "deleteAccount")();
+  await callFunction("deleteAccount");
   await signOut(auth).catch(() => {});
 }
 
