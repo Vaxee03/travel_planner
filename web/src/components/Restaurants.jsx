@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { fetchRestaurantRecommendations } from "../lib/recommendations";
-import { saveTrip } from "../lib/tripsApi";
 import { fmtDate } from "../lib/utils";
 import InfoTooltip from "./InfoTooltip";
 
@@ -13,17 +12,18 @@ function addedDates(trip, name) {
 }
 
 export default function Restaurants({ trip, openModal, canAddToItinerary }) {
-  const [preferences, setPreferences] = useState(trip.restaurantRecs?.preferences || "");
+  const [preferences, setPreferences] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const rec = trip.restaurantRecs;
+  // Results live only in this tab's state (not saved to the trip), so they
+  // reset whenever the user leaves the tab, opens another trip or reloads.
+  const [rec, setRec] = useState(null);
 
   async function handleFetch() {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchRestaurantRecommendations(trip.destination, preferences, trip.tripType);
-      await saveTrip({ ...trip, restaurantRecs: data });
+      setRec(await fetchRestaurantRecommendations(trip.destination, preferences, trip.tripType));
     } catch (err) {
       setError(err?.message || "맛집 추천을 가져오지 못했어요.");
     } finally {
