@@ -10,6 +10,7 @@ import InviteCard from "./InviteCard";
 import LocationViewer from "./LocationViewer";
 import RouteMapViewer from "./RouteMapViewer";
 import { reportError } from "../lib/errorReporting";
+import { shareLink, shareButtonLabel } from "../lib/share";
 import { useNicknames } from "../lib/useNicknames";
 import { DEFAULT_NICKNAME } from "../lib/users";
 import { PERMISSION_CATEGORIES } from "../lib/permissions";
@@ -232,13 +233,15 @@ function ShareLinkForm({ trip, onSubmit, onClose }) {
     }
   }
 
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-    } catch {
-      setCopied(false);
-    }
+  // On phones this opens the share sheet (KakaoTalk etc.); elsewhere it copies.
+  async function share() {
+    const result = await shareLink({
+      title: `${trip.title} · 공유 일정`,
+      text: `'${trip.title}' 여행 일정이에요.`,
+      url,
+    });
+    setCopied(result === "copied");
+    if (result === "failed") setError("공유하지 못했어요. 위의 링크를 직접 복사해주세요.");
   }
 
   return (
@@ -258,7 +261,7 @@ function ShareLinkForm({ trip, onSubmit, onClose }) {
             <button type="button" className="btn btn-danger" disabled={busy} onClick={() => toggle("off")}>링크 끄기</button>
             <span className="btn-row">
               <button type="button" className="btn" onClick={onClose}>닫기</button>
-              <button type="button" className="btn btn-primary" onClick={copy}>{copied ? "복사됨 ✓" : "링크 복사"}</button>
+              <button type="button" className="btn btn-primary" onClick={share}>{copied ? "복사됨 ✓" : shareButtonLabel()}</button>
             </span>
           </div>
         </>

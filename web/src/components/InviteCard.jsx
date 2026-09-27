@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { drawInviteCard, canvasToBlob, inviteJoinUrl } from "../lib/inviteCard";
 import { saveBlobAsFile } from "../lib/utils";
+import { shareLink, shareButtonLabel } from "../lib/share";
 
 function CopyField({ label, value, copyKey, onCopy, inputRef, mono }) {
   return (
@@ -31,6 +32,7 @@ export default function InviteCard({ trip, onClose }) {
   const [ready, setReady] = useState(false);
   const [codeCopyKey, setCodeCopyKey] = useState(0);
   const [linkCopyKey, setLinkCopyKey] = useState(0);
+  const [shareNote, setShareNote] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -39,6 +41,19 @@ export default function InviteCard({ trip, onClose }) {
     });
     return () => { cancelled = true; };
   }, [trip]);
+
+  async function handleShare() {
+    const result = await shareLink({
+      title: `${trip.title} 초대`,
+      text: `'${trip.title}' 여행에 초대할게요! 링크를 눌러 함께 계획해요.`,
+      url: inviteJoinUrl(trip.id),
+    });
+    setShareNote(
+      result === "copied" ? "초대 링크를 복사했어요. 카카오톡 등에 붙여넣어 보내주세요."
+      : result === "failed" ? "공유하지 못했어요. 위의 초대 링크를 직접 복사해주세요."
+      : null
+    );
+  }
 
   async function handleDownload() {
     const blob = await canvasToBlob(canvasRef.current);
@@ -92,9 +107,11 @@ export default function InviteCard({ trip, onClose }) {
         inputRef={linkInputRef}
         onCopy={() => copyText(inviteJoinUrl(trip.id), linkInputRef, setLinkCopyKey)}
       />
-      <div className="modal-actions">
+      {shareNote && <div className="section-note" style={{ marginTop: 10 }}>{shareNote}</div>}
+      <div className="modal-actions" style={{ flexWrap: "wrap" }}>
         <button type="button" className="btn" onClick={onClose}>닫기</button>
-        <button type="button" className="btn btn-primary" onClick={handleDownload} disabled={!ready}>이미지 다운로드</button>
+        <button type="button" className="btn" onClick={handleDownload} disabled={!ready}>이미지 다운로드</button>
+        <button type="button" className="btn btn-primary" onClick={handleShare}>{shareButtonLabel()}</button>
       </div>
     </>
   );
