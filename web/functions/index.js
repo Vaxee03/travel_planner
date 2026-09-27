@@ -107,6 +107,25 @@ exports.deleteAccount = onCall({ region: "us-central1" }, async (request) => {
 
 const MODEL = "gemini-3.6-flash";
 
+// Each Gemini call is billed, and any signed-in user can call the function
+// directly, so cap it per user per (Korean) calendar day. Counted in
+// aiUsage/{uid} — no client rule matches that collection, so only this
+// function (Admin SDK) can read or write it.
+const DAILY_AI_LIMIT = 20;
+
+async function consumeDailyAiQuota(uid) {
+  const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10); // KST
+  const ref = db.doc(`aiUsage/${uid}`);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const used = snap.exists && snap.data().day === today ? snap.data().count || 0 : 0;
+    if (used >= DAILY_AI_LIMIT) {
+      throw new HttpsError("resource-exhausted", `오늘 맛집 추천은 ${DAILY_AI_LIMIT}번까지 받을 수 있어요. 내일 다시 시도해주세요.`);
+    }
+    tx.set(ref, { day: today, count: used + 1, updatedAt: Date.now() });
+  });
+}
+
 function extractJson(text) {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const candidate = fenced ? fenced[1] : text;
@@ -126,6 +145,8 @@ exports.recommendRestaurants = onCall({ secrets: ["GEMINI_API_KEY"], region: "us
   if (!destination) {
     throw new HttpsError("invalid-argument", "여행지 정보가 필요해요.");
   }
+
+  await consumeDailyAiQuota(request.auth.uid);
 
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -147,6 +168,8 @@ ${preferences ? `사용자가 원하는 조건: "${preferences}". 이 조건에 
     });
   } catch (err) {
     console.error("Gemini call failed", err);
+    // A failed call isn't billed, so it shouldn't use up the user's quota.
+    await db.doc(`aiUsage/${request.auth.uid}`).update({ count: FieldValue.increment(-1) }).catch(() => {});
     throw new HttpsError("internal", "맛집 추천을 가져오지 못했어요.");
   }
 
