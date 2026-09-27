@@ -278,3 +278,32 @@ footer.app-footer .footer-links a, footer.app-footer .footer-links .btn-ghost{ c
 .location-chip{ display:inline-flex; align-items:center; gap:6px; font-size:14px; color:var(--accent); }
 .route-stops{ margin:14px 0 0; padding:0; list-style:none; display:flex; flex-direction:column; gap:6px; font-size:14px; }
 .route-stops b{ display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; margin-right:6px; border-radius:50%; background:var(--accent); color:#fff; font-size:12px; }
+
+/* ---- Phone layout ----
+   On a 375px-wide phone the trip header used to take ~600px (4 rows of
+   chips, 3 rows of action buttons, 45px gaps) and the tabs wrapped onto two
+   lines, so the actual itinerary started below the fold. Tighten spacing and
+   turn the action buttons and tabs into single swipeable rows. */
+@media (max-width:600px){
+  body{ padding:24px 16px 64px; }
+  header.top{ gap:10px; padding-bottom:18px; margin-bottom:22px; }
+  header.top h1{ font-size:26px; }
+  .subline{ font-size:14px; }
+
+  .trip-head{ gap:18px; margin-bottom:20px; padding-bottom:18px; }
+  .trip-head h1{ font-size:24px; line-height:1.25; }
+  .chips{ gap:6px; }
+  .chip{ font-size:13px; padding:5px 10px; }
+
+  .trip-actions, .tabbar{
+    flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none;
+    -webkit-overflow-scrolling:touch; margin-right:-16px; padding-right:16px;
+  }
+  .trip-actions::-webkit-scrollbar, .tabbar::-webkit-scrollbar{ display:none; }
+  .trip-actions > *, .tabbar > *{ flex-shrink:0; white-space:nowrap; }
+  .tabbar{ margin-bottom:20px; }
+  .tab{ margin-right:10px; font-size:15.5px; }
+
+  .modal-overlay{ padding:12px; }
+  .modal{ padding:20px 16px 18px; max-height:92vh; }
+}
