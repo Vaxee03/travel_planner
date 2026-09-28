@@ -476,7 +476,7 @@ export default function App() {
             <h1>여행 플래너</h1>
             <div className="subline">여러 여행을 관리하고, 다녀온 여행엔 후기와 사진을 남겨보세요.</div>
           </div>
-          <div className="btn-row" style={{ alignItems: "center" }}>
+          <div className="btn-row" style={{ alignItems: "center", ...(!user && loginPage ? { alignSelf: "flex-end" } : null) }}>
             {!user && loginPage && (
               // Back to wherever they came from inside the site (usually the
               // landing page); a direct visit to /login has nothing to go back
@@ -484,7 +484,7 @@ export default function App() {
               <button
                 type="button"
                 className="back-link"
-                style={{ marginBottom: 0 }}
+                style={{ marginBottom: 0, fontSize: 16.5 }}
                 onClick={() => (location.key !== "default" ? navigate(-1) : navigate("/"))}
               >
                 ← 뒤로가기
