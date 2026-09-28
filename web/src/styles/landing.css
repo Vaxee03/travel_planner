@@ -62,7 +62,7 @@ body.lp-body{ padding:0; }
 .lp-flight{ position:absolute; inset:0; pointer-events:none; }
 .lp-flight > svg{ position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
 .lp-trail{ fill:none; stroke:var(--accent); stroke-width:1.6; stroke-dasharray:5 9; stroke-linecap:round; opacity:.4; }
-.lp-plane{ position:absolute; top:0; left:0; will-change:transform; filter:drop-shadow(0 4px 6px rgba(0,0,0,.18)); }
+.lp-plane{ position:absolute; top:0; left:0; opacity:0; will-change:transform; filter:drop-shadow(0 4px 6px rgba(0,0,0,.18)); }
 .lp-flight-hero{ z-index:0; }
 .lp-flight-journey{ z-index:0; }
 .lp-flight-journey .lp-plane{ z-index:3; }

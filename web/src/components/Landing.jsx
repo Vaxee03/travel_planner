@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   AnimatePresence, LazyMotion, MotionConfig, animate, domAnimation, m as motion, useInView,
@@ -80,8 +80,9 @@ function CountUp({ to, suffix = "원" }) {
 /** Moves `planeRef` along an SVG path as `progress` (0–1) changes. The path
  * lives in a viewBox stretched over `boxRef` (preserveAspectRatio="none"), so
  * points are scaled into the box's pixels and the plane is rotated to the
- * on-screen direction of travel. */
-function usePathFollower(progress, pathRef, boxRef, planeRef, viewBox) {
+ * on-screen direction of travel. With `fadeOut` the plane fades away over the
+ * last stretch instead of parking at the end of the path. */
+function usePathFollower(progress, pathRef, boxRef, planeRef, viewBox, fadeOut) {
   const place = useCallback((p) => {
     const path = pathRef.current, box = boxRef.current, plane = planeRef.current;
     if (!path || !box || !plane) return;
@@ -92,10 +93,13 @@ function usePathFollower(progress, pathRef, boxRef, planeRef, viewBox) {
     const sx = box.clientWidth / viewBox.w, sy = box.clientHeight / viewBox.h;
     const angle = (Math.atan2((b.y - a.y) * sy, (b.x - a.x) * sx) * 180) / Math.PI;
     plane.style.transform = `translate(${a.x * sx}px, ${a.y * sy}px) translate(-50%, -50%) rotate(${angle}deg)`;
-  }, [pathRef, boxRef, planeRef, viewBox.w, viewBox.h]);
+    plane.style.opacity = fadeOut && p > 0.85 ? String(Math.max(0, (1 - p) / 0.15)) : "1";
+  }, [pathRef, boxRef, planeRef, viewBox.w, viewBox.h, fadeOut]);
 
   useMotionValueEvent(progress, "change", place);
-  useLayoutEffect(() => {
+  // A passive effect, not a layout one: the box ref belongs to the parent,
+  // which React attaches only after this component's layout effects run.
+  useEffect(() => {
     place(progress.get());
     const onResize = () => place(progress.get());
     window.addEventListener("resize", onResize);
@@ -104,10 +108,10 @@ function usePathFollower(progress, pathRef, boxRef, planeRef, viewBox) {
 }
 
 /** A dashed trail that is revealed up to `progress`, with the plane on its tip. */
-function FlightPath({ d, viewBox, progress, boxRef, className, maskId }) {
+function FlightPath({ d, viewBox, progress, boxRef, className, maskId, fadeOut = false }) {
   const pathRef = useRef(null);
   const planeRef = useRef(null);
-  usePathFollower(progress, pathRef, boxRef, planeRef, viewBox);
+  usePathFollower(progress, pathRef, boxRef, planeRef, viewBox, fadeOut);
   return (
     <div className={className} aria-hidden="true">
       <svg viewBox={`0 0 ${viewBox.w} ${viewBox.h}`} preserveAspectRatio="none">
@@ -567,7 +571,7 @@ export default function Landing() {
 
         <header className="lp-hero" ref={heroRef}>
           {!reduce && (
-            <FlightPath d={HERO_PATH} viewBox={{ w: 1000, h: 400 }} progress={heroProgress} boxRef={heroRef} className="lp-flight lp-flight-hero" maskId="lp-hero-mask" />
+            <FlightPath d={HERO_PATH} viewBox={{ w: 1000, h: 400 }} progress={heroProgress} boxRef={heroRef} className="lp-flight lp-flight-hero" maskId="lp-hero-mask" fadeOut />
           )}
           <div className="lp-hero-text">
             <motion.div className="lp-eyebrow" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: EASE }}>
