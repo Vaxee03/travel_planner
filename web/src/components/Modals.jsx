@@ -338,7 +338,7 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit }
           <button
             type="button"
             className="btn btn-primary"
-            style={{ background: "var(--danger)", borderColor: "var(--danger)" }}
+            style={modal.tone === "primary" ? undefined : { background: "var(--danger)", borderColor: "var(--danger)" }}
             onClick={() => onSubmit(modal, {})}
           >
             {modal.confirmLabel || "삭제"}

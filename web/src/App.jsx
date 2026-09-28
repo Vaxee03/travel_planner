@@ -197,6 +197,11 @@ export default function App() {
   async function handleModalSubmit(m, values) {
     const seenTrip = m.tripAtOpen || trip;
     if (m.type === "confirm") {
+      if (m.run) {
+        m.run();
+        closeModal();
+        return;
+      }
       if (m.onYes === "delete-trip") {
         await deleteTrip(tripId);
         navigate("/", { replace: true });

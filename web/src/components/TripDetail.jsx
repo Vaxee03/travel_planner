@@ -18,6 +18,21 @@ const TABS = [
 ];
 
 export default function TripDetail({ trip, uid, perms, tab, setTab, dayIdx, setDayIdx, openModal, requestDelete, toggleCheck, reorderDayItems, onBack, onEditTrip, onDeleteTrip }) {
+  function confirmIcsExport() {
+    const count = (trip.days || []).reduce((n, d) => n + (d.items?.length || 0), 0);
+    if (!count) {
+      window.alert("아직 캘린더로 내보낼 일정이 없어요. 일정을 먼저 추가해주세요.");
+      return;
+    }
+    // run() fires inside the confirm click itself, so the download still
+    // counts as user-initiated (Safari blocks it otherwise).
+    requestDelete("export-ics", `일정 ${count}개를 캘린더 파일(.ics)로 내려받을까요? 구글 캘린더, 아이폰 캘린더 등에서 열어 추가할 수 있어요.`, {
+      confirmLabel: "내보내기",
+      tone: "primary",
+      run: () => downloadTripIcs(trip),
+    });
+  }
+
   const st = tripStatus(trip);
   const dday = ddayLabel(trip);
   const canReview = st === "completed";
@@ -49,7 +64,7 @@ export default function TripDetail({ trip, uid, perms, tab, setTab, dayIdx, setD
         </div>
         <div className="btn-row trip-actions">
           <button className="btn btn-sm" onClick={() => openModal({ type: "invite" })}>🎟 동행자 초대</button>
-          <button className="btn btn-sm" onClick={() => downloadTripIcs(trip)}>📅 캘린더로 내보내기</button>
+          <button className="btn btn-sm" onClick={confirmIcsExport}>📅 캘린더로 내보내기</button>
           <button className="btn btn-sm" onClick={() => openModal({ type: "duplicate-trip" })}>📋 여행 복제</button>
           {perms.isOwner && (
             <>
