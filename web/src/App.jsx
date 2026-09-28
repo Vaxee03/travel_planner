@@ -477,6 +477,19 @@ export default function App() {
             <div className="subline">여러 여행을 관리하고, 다녀온 여행엔 후기와 사진을 남겨보세요.</div>
           </div>
           <div className="btn-row" style={{ alignItems: "center" }}>
+            {!user && loginPage && (
+              // Back to wherever they came from inside the site (usually the
+              // landing page); a direct visit to /login has nothing to go back
+              // to, so fall back to the landing page.
+              <button
+                type="button"
+                className="back-link"
+                style={{ marginBottom: 0 }}
+                onClick={() => (location.key !== "default" ? navigate(-1) : navigate("/"))}
+              >
+                ← 뒤로가기
+              </button>
+            )}
             {user && (
               <span className="btn-row" style={{ alignItems: "center" }}>
                 <span style={{ color: "var(--nickname)", fontSize: 15, fontWeight: 700 }}>{nickname || "닉네임 없음"}</span>
@@ -500,7 +513,7 @@ export default function App() {
       ) : !authResolved ? (
         <div className="empty">불러오는 중이에요…</div>
       ) : !user ? (
-        <AuthGate onAuthed={setUser} showIntroLink={loginPage} />
+        <AuthGate onAuthed={setUser} />
       ) : !tripsReady ? (
         <div className="empty">저장 기능을 불러오는 중이에요…</div>
       ) : joinId ? (

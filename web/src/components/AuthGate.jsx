@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import {
   signIn, signUp, signInWithGoogle, signInWithKakao, setRememberMe, sendPasswordReset, authErrorMessage,
 } from "../lib/firebase";
@@ -29,7 +28,7 @@ function KakaoLogo() {
   );
 }
 
-export default function AuthGate({ onAuthed, showIntroLink }) {
+export default function AuthGate({ onAuthed }) {
   const [mode, setMode] = useState("login"); // "login" | "signup"
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -114,7 +113,6 @@ export default function AuthGate({ onAuthed, showIntroLink }) {
 
   return (
     <section className="auth">
-      {showIntroLink && <Link className="back-link" to="/">← 서비스 소개</Link>}
       <div className="card auth-card">
         <h2 className="auth-title">{isSignup ? "회원가입" : "로그인"}</h2>
         <p className="auth-sub">{isSignup ? "이메일로 가입하고 첫 여행을 계획해보세요." : "다시 만나서 반가워요. 여행 계획을 이어가볼까요?"}</p>
