@@ -98,7 +98,7 @@ export async function drawInviteCard(canvas, trip) {
   // unloaded at draw time, so they silently fall back to a different font.
   // Passing every string this card actually draws forces that subset in.
   const sampleText = [
-    "TRAVEL PLANNER", "동행자 초대장", "동행자 초대", "여행", "여행 기간", "총 예산", "참여 코드",
+    "TRIP PLANNER", "동행자 초대장", "동행자 초대", "여행", "여행 기간", "총 예산", "참여 코드",
     `${trip.travelers || 1}명`, trip.destination || "", trip.title || "", dateRange, budgetText, code,
     window.location.host,
   ].join(" ");
@@ -119,7 +119,7 @@ export async function drawInviteCard(canvas, trip) {
 
   ctx.fillStyle = "#c9a35f";
   ctx.font = `12px ${FONT}`;
-  ctx.fillText("T R A V E L   P L A N N E R", PAD, PAD + 4);
+  ctx.fillText("T R I P   P L A N N E R", PAD, PAD + 4);
 
   ctx.fillStyle = "#ece6db";
   ctx.font = `26px ${FONT}`;

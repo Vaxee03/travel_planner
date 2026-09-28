@@ -441,7 +441,7 @@ export default function App() {
   return (
     <div className="page">
       <header className="top">
-        <span className="eyebrow">Travel Planner</span>
+        <span className="eyebrow">Trip Planner</span>
         <div className="top-row">
           <div>
             <h1>여행 플래너</h1>

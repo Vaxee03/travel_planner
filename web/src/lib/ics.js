@@ -31,12 +31,12 @@ function addDays(dateStr, n) {
 export function buildTripIcs(trip) {
   const now = new Date();
   const dtstamp = `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}T${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}Z`;
-  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Travel Planner//KO", "CALSCALE:GREGORIAN"];
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Trip Planner//KO", "CALSCALE:GREGORIAN"];
 
   (trip.days || []).forEach((day, dayIdx) => {
     (day.items || []).forEach((item, itemIdx) => {
       lines.push("BEGIN:VEVENT");
-      lines.push(`UID:${trip.id}-${dayIdx}-${itemIdx}@travel-planner`);
+      lines.push(`UID:${trip.id}-${dayIdx}-${itemIdx}@tripplanner.kr`);
       lines.push(`DTSTAMP:${dtstamp}`);
       if (item.kind === "time" && item.time) {
         const start = new Date(`${day.date}T${item.time}:00`);
