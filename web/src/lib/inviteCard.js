@@ -3,6 +3,11 @@ import { fmtMoney, truncateCanvasText } from "./utils";
 const W = 720;
 const H = 460;
 const PAD = 40;
+// Type scale for the whole card — text sizes and the spacing between lines
+// grow together so the layout keeps its proportions.
+const TS = 1.15;
+const px = (size) => `${Math.round(size * TS)}px ${FONT}`;
+const sp = (n) => Math.round(n * TS);
 const FONT = '"Jua", "Noto Sans KR", sans-serif';
 
 export function inviteJoinUrl(tripId) {
@@ -104,8 +109,8 @@ export async function drawInviteCard(canvas, trip) {
   ].join(" ");
   if (document.fonts) {
     await Promise.all([
-      document.fonts.load(`16px ${FONT}`, sampleText),
-      document.fonts.load(`52px ${FONT}`, sampleText),
+      document.fonts.load(px(16), sampleText),
+      document.fonts.load(px(52), sampleText),
       document.fonts.ready,
     ]);
   }
@@ -118,58 +123,58 @@ export async function drawInviteCard(canvas, trip) {
   ctx.textBaseline = "alphabetic";
 
   ctx.fillStyle = "#c9a35f";
-  ctx.font = `12px ${FONT}`;
-  ctx.fillText("T R I P   P L A N N E R", PAD, PAD + 4);
+  ctx.font = px(12);
+  ctx.fillText("T R I P   P L A N N E R", PAD, PAD + sp(4));
 
   ctx.fillStyle = "#ece6db";
-  ctx.font = `26px ${FONT}`;
-  ctx.fillText("동행자 초대장", PAD, PAD + 42);
+  ctx.font = px(26);
+  ctx.fillText("동행자 초대장", PAD, PAD + sp(42));
 
-  const infoY = PAD + 78;
+  const infoY = PAD + sp(78);
   const infoParts = ["동행자 초대", `${trip.travelers || 1}명`, `${trip.destination || "여행"}`];
-  ctx.font = `14px ${FONT}`;
+  ctx.font = px(14);
   let ix = PAD;
   infoParts.forEach((part, i) => {
     ctx.fillStyle = i === 0 ? "#e07a63" : "#ece6db";
     ctx.fillText(part, ix, infoY);
-    ix += ctx.measureText(part).width + 14;
+    ix += ctx.measureText(part).width + sp(14);
     if (i < infoParts.length - 1) {
       ctx.fillStyle = "rgba(236,230,219,0.35)";
       ctx.fillText("|", ix, infoY);
-      ix += ctx.measureText("|").width + 14;
+      ix += ctx.measureText("|").width + sp(14);
     }
   });
 
   ctx.fillStyle = "#e2624a";
-  ctx.font = `52px ${FONT}`;
+  ctx.font = px(52);
   const title = truncateCanvasText(ctx, trip.title || "여행", W - PAD * 2);
-  ctx.fillText(title, PAD, infoY + 66);
+  ctx.fillText(title, PAD, infoY + sp(66));
 
-  const rowsY = infoY + 108;
+  const rowsY = infoY + sp(108);
   const rows = [
     ["여행 기간", dateRange],
     ["총 예산", budgetText],
   ];
   rows.forEach(([label, value], i) => {
-    const y = rowsY + i * 30;
+    const y = rowsY + i * sp(30);
     ctx.fillStyle = "rgba(236,230,219,0.6)";
-    ctx.font = `14px ${FONT}`;
+    ctx.font = px(14);
     ctx.fillText(label, PAD, y);
     ctx.fillStyle = "#c9a35f";
-    ctx.font = `15px ${FONT}`;
-    ctx.fillText(value, PAD + 92, y);
+    ctx.font = px(15);
+    ctx.fillText(value, PAD + sp(92), y);
   });
 
-  const codeY = H - PAD - 56;
+  const codeY = H - PAD - sp(56);
   ctx.fillStyle = "rgba(236,230,219,0.6)";
-  ctx.font = `13px ${FONT}`;
+  ctx.font = px(13);
   ctx.fillText("참여 코드", PAD, codeY);
   ctx.fillStyle = "#ece6db";
-  ctx.font = `22px ${FONT}`;
-  ctx.fillText(code, PAD, codeY + 30);
+  ctx.font = px(22);
+  ctx.fillText(code, PAD, codeY + sp(30));
   ctx.fillStyle = "#e07a63";
-  ctx.font = `13px ${FONT}`;
-  ctx.fillText("🔗 " + window.location.host, PAD, codeY + 54);
+  ctx.font = px(13);
+  ctx.fillText("🔗 " + window.location.host, PAD, codeY + sp(54));
 
   ctx.restore();
 }
