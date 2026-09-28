@@ -108,7 +108,7 @@ function usePathFollower(progress, pathRef, boxRef, planeRef, viewBox, fadeOut) 
 }
 
 /** A dashed trail that is revealed up to `progress`, with the plane on its tip. */
-function FlightPath({ d, viewBox, progress, boxRef, className, maskId, fadeOut = false }) {
+function FlightPath({ d, viewBox, progress, boxRef, className, maskId, fadeOut = false, planeSize = 34 }) {
   const pathRef = useRef(null);
   const planeRef = useRef(null);
   usePathFollower(progress, pathRef, boxRef, planeRef, viewBox, fadeOut);
@@ -123,7 +123,7 @@ function FlightPath({ d, viewBox, progress, boxRef, className, maskId, fadeOut =
         <path ref={pathRef} d={d} fill="none" stroke="none" />
         <path d={d} className="lp-trail" mask={`url(#${maskId})`} vectorEffect="non-scaling-stroke" />
       </svg>
-      <div ref={planeRef} className="lp-plane"><PaperPlane /></div>
+      <div ref={planeRef} className="lp-plane"><PaperPlane size={planeSize} /></div>
     </div>
   );
 }
@@ -628,7 +628,7 @@ export default function Landing() {
 
         <div className="lp-journey" ref={journeyRef}>
           {!reduce && (
-            <FlightPath d={JOURNEY_PATH} viewBox={{ w: 100, h: 1000 }} progress={journeyProgress} boxRef={journeyRef} className="lp-flight lp-flight-journey" maskId="lp-journey-mask" />
+            <FlightPath d={JOURNEY_PATH} viewBox={{ w: 100, h: 1000 }} progress={journeyProgress} boxRef={journeyRef} className="lp-flight lp-flight-journey" maskId="lp-journey-mask" planeSize={46} />
           )}
 
           <section className="lp-section" id="features">
