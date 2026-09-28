@@ -190,7 +190,7 @@ section{ margin-bottom:44px; }
 .day-summary-text.muted{ color:var(--ink-soft); font-style:italic; }
 .day-arrow{ flex:0 0 auto; font-size:14.5px; color:var(--accent); font-weight:700; white-space:nowrap; }
 
-.back-link{ display:inline-flex; align-items:center; gap:6px; font-size:15.5px; font-weight:700; color:var(--ink-soft); background:none; border:none; padding:0; cursor:pointer; margin-bottom:24px; }
+.back-link{ text-decoration:none; display:inline-flex; align-items:center; gap:6px; font-size:15.5px; font-weight:700; color:var(--ink-soft); background:none; border:none; padding:0; cursor:pointer; margin-bottom:24px; }
 .back-link:hover{ color:var(--accent); }
 
 .detail-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:4px; flex-wrap:wrap; }

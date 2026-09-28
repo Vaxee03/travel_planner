@@ -20,6 +20,11 @@ const ModalHost = lazy(loadModals);
 const PublicTripView = lazy(() => import("./components/PublicTripView"));
 const TermsPage = lazy(() => import("./components/LegalPage").then((m) => ({ default: m.TermsPage })));
 const PrivacyPage = lazy(() => import("./components/LegalPage").then((m) => ({ default: m.PrivacyPage })));
+// The landing page is what signed-out visitors see at "/"; start fetching it
+// right away there so it isn't waiting on the auth check to begin loading.
+const loadLanding = () => import("./components/Landing");
+const Landing = lazy(loadLanding);
+if (typeof window !== "undefined" && window.location.pathname === "/") loadLanding();
 
 const TAB_KEYS = ["itinerary", "budget", "checklist", "bookings", "restaurants", "review"];
 
@@ -85,10 +90,16 @@ export default function App() {
 
   // Any other path (typo, old bookmark) just falls back to the trip list.
   const legalPage = location.pathname === "/terms" ? "terms" : location.pathname === "/privacy" ? "privacy" : null;
-  const knownPath = Boolean(location.pathname === "/" || tripMatch || joinMatch || shareMatch || legalPage);
+  const loginPage = location.pathname === "/login";
+  const knownPath = Boolean(location.pathname === "/" || loginPage || tripMatch || joinMatch || shareMatch || legalPage);
   useEffect(() => {
     if (!knownPath) navigate("/", { replace: true });
   }, [knownPath, navigate]);
+
+  // /login is only for signed-out visitors; once signed in, go to the trips.
+  useEffect(() => {
+    if (user && loginPage) navigate("/", { replace: true });
+  }, [user, loginPage, navigate]);
 
   // The day picked inside the itinerary tab isn't part of the URL, so it
   // resets whenever a different trip is opened.
@@ -443,6 +454,19 @@ export default function App() {
     }
   }
 
+  // Signed-out visitors at "/" get the full-width landing page instead of the
+  // app shell (the login form lives at /login). Until auth is known, render
+  // nothing there so a signed-in user doesn't see the landing flash by.
+  const onLandingPath = location.pathname === "/" && !joinId && !authError;
+  if (onLandingPath && !authResolved) return null;
+  if (onLandingPath && !user) {
+    return (
+      <Suspense fallback={null}>
+        <Landing />
+      </Suspense>
+    );
+  }
+
   return (
     <div className="page">
       <header className="top">
@@ -476,7 +500,7 @@ export default function App() {
       ) : !authResolved ? (
         <div className="empty">불러오는 중이에요…</div>
       ) : !user ? (
-        <AuthGate onAuthed={setUser} />
+        <AuthGate onAuthed={setUser} showIntroLink={loginPage} />
       ) : !tripsReady ? (
         <div className="empty">저장 기능을 불러오는 중이에요…</div>
       ) : joinId ? (

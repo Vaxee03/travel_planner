@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { signIn, signUp, signInWithGoogle, signInWithKakao, authErrorMessage } from "../lib/firebase";
 
-export default function AuthGate({ onAuthed }) {
+export default function AuthGate({ onAuthed, showIntroLink }) {
   const [mode, setMode] = useState("login"); // "login" | "signup"
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -52,6 +52,7 @@ export default function AuthGate({ onAuthed }) {
 
   return (
     <section style={{ maxWidth: 420, margin: "40px auto 0" }}>
+      {showIntroLink && <Link className="back-link" to="/">← 서비스 소개</Link>}
       <div className="card">
         <div className="btn-row" style={{ marginBottom: 22, borderBottom: "1px solid var(--line)", paddingBottom: 4 }}>
           <button
