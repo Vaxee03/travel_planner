@@ -150,7 +150,7 @@ export default function AuthGate({ onAuthed, showIntroLink }) {
           </label>
           {!isSignup && (
             <button type="button" className="auth-link" onClick={handleForgot} disabled={loading}>
-              앗, 비밀번호를 잊어버렸어요!
+              비밀번호를 잊어버렸어요!
             </button>
           )}
         </div>
@@ -170,9 +170,6 @@ export default function AuthGate({ onAuthed, showIntroLink }) {
           {isSignup ? "이미 계정이 있어요 · 로그인" : "처음이신가요? 회원가입"}
         </button>
 
-        <p className="auth-consent">
-          가입하거나 소셜 계정으로 계속하면 <Link to="/terms">이용약관</Link> 및 <Link to="/privacy">개인정보처리방침</Link>에 동의하는 것으로 간주돼요.
-        </p>
       </div>
     </section>
   );

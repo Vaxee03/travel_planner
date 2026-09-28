@@ -318,7 +318,6 @@ footer.app-footer .footer-links a, footer.app-footer .footer-links .btn-ghost{ c
 .auth-social-btn.kakao{ background:#FEE500; border-color:#FEE500; }
 .auth-switch{ width:100%; height:50px; justify-content:center; margin-top:26px; border-radius:12px; border:1.5px solid var(--line); font-size:15.5px; }
 .auth-switch:hover{ border-color:var(--accent); color:var(--accent); }
-.auth-consent{ font-size:12.5px; color:var(--ink-soft); text-align:center; margin:16px 0 0; line-height:1.6; }
 
 @media (max-width:600px){
   .auth{ margin-top:8px; }
