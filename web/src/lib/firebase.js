@@ -4,6 +4,7 @@ import {
   getAuth, onAuthStateChanged, connectAuthEmulator, signInWithCustomToken, signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut, GoogleAuthProvider, OAuthProvider, signInWithPopup,
+  setPersistence, browserLocalPersistence, browserSessionPersistence, sendPasswordResetEmail,
 } from "firebase/auth";
 
 // Firebase console → Authentication → Sign-in method → Add new provider →
@@ -107,6 +108,20 @@ export function signUp(email, password) {
   return createUserWithEmailAndPassword(auth, email, password);
 }
 
+/** "로그인 상태 유지" — kept: the session survives closing the browser
+ * (Firebase's default); unchecked: it ends when the browser/tab closes.
+ * Applies to the next sign-in, so call it right before signing in. */
+export function setRememberMe(remember) {
+  return setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
+}
+
+/** Sends Firebase's password-reset email (in Korean). With email-enumeration
+ * protection on, this resolves even for addresses with no account. */
+export function sendPasswordReset(email) {
+  auth.languageCode = "ko";
+  return sendPasswordResetEmail(auth, email);
+}
+
 export function signOutUser() {
   return signOut(auth);
 }
@@ -131,6 +146,7 @@ export function authErrorMessage(err) {
   const map = {
     "auth/email-already-in-use": "이미 가입된 이메일이에요. 로그인해주세요.",
     "auth/invalid-email": "이메일 형식이 올바르지 않아요.",
+    "auth/missing-email": "이메일을 입력해주세요.",
     "auth/weak-password": "비밀번호는 6자 이상이어야 해요.",
     "auth/wrong-password": "비밀번호가 올바르지 않아요.",
     "auth/invalid-credential": "이메일 또는 비밀번호가 올바르지 않아요.",
