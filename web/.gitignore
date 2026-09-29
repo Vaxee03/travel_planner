@@ -24,3 +24,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# QA run artifacts
+e2e/results.json
+e2e/rules-result.json
+e2e/state.json
+e2e/shots/
