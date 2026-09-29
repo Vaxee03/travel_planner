@@ -594,7 +594,7 @@ export default function Landing({ signedIn = false }) {
       <div className="lp">
         <nav className="lp-nav">
           <Link to="/" className="lp-logo">
-            <PaperPlane size={22} />
+            <PaperPlane size={30} />
             <span>Trip Planner</span>
           </Link>
           <div className="lp-nav-links">
