@@ -1,10 +1,11 @@
 import { Link } from "react-router-dom";
 
-// ⚠️ DRAFT — written as a starting point, not legal advice. Fill in the
-// [대괄호] placeholders and have it reviewed before a store launch.
-const OPERATOR = "[운영자명/상호]";
-const CONTACT = "[문의 이메일]";
-const EFFECTIVE_DATE = "[시행일, 예: 2026년 10월 1일]";
+// ⚠️ Written as a starting point, not legal advice — have it reviewed
+// before a store launch.
+const OPERATOR = "초보개발자";
+const CONTACT_EMAIL = "tripptriplanner@naver.com";
+const CONTACT = <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>;
+const EFFECTIVE_DATE = "2026년 10월 1일";
 
 function Page({ title, children }) {
   return (
