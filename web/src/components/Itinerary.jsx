@@ -72,6 +72,13 @@ function ItineraryMemo({ trip, canEdit }) {
   const [text, setText] = useState(trip.itineraryMemo || "");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
+  const [savedAt, setSavedAt] = useState(0);
+  // "저장됨 ✓" shows for a couple of seconds after each save.
+  useEffect(() => {
+    if (!savedAt) return undefined;
+    const t = setTimeout(() => setSavedAt(0), 2500);
+    return () => clearTimeout(t);
+  }, [savedAt]);
   const dirtyRef = useRef(false);
 
   useEffect(() => {
@@ -85,6 +92,7 @@ function ItineraryMemo({ trip, canEdit }) {
     try {
       await mutateTrip(trip.id, (t) => { t.itineraryMemo = text; });
       dirtyRef.current = false;
+      setSavedAt(Date.now());
     } catch {
       // Keep the typed text (still marked dirty, so incoming updates don't
       // overwrite it); leaving the box again retries.
@@ -98,7 +106,9 @@ function ItineraryMemo({ trip, canEdit }) {
     <section style={{ marginTop: 28 }}>
       <div className="section-head">
         <h2>📝 메모</h2>
-        {saving && <span className="section-note">저장 중…</span>}
+        {saving ? <span className="section-note">저장 중…</span>
+          : savedAt ? <span className="section-note" style={{ color: "var(--confirmed)" }}>저장됨 ✓</span>
+          : canEdit ? <span className="section-note">입력을 마치면 자동으로 저장돼요</span> : null}
       </div>
       {saveError && <div className="note" style={{ marginTop: 0, marginBottom: 10 }}><span className="dot" /><span>{saveError}</span></div>}
       <textarea

@@ -385,7 +385,8 @@ await tc("T-21", A, "여행 메모 자동 저장",
     await p.click(".itinerary-memo");
     await p.keyboard.type("여권 챙기기! 환전은 공항에서");
     await p.click("h2");
-    await wait(1500);
+    await waitFor(p, () => [...document.querySelectorAll(".section-note")].some((n) => n.innerText.includes("저장됨")), { label: "saved badge", timeout: 5000 });
+    await wait(300);
     await p.reload({ waitUntil: "domcontentloaded" });
     await waitFor(p, () => !!document.querySelector(".itinerary-memo"), { label: "memo" });
     await wait(1000);
