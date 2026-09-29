@@ -37,14 +37,19 @@ function Icon({ name, size = 22 }) {
   );
 }
 
-/** The brand paper plane, nose pointing right (0°) so it can be rotated to
- * follow a path. */
+/** The brand paper plane — a folded dart drawn in the accent color with
+ * shaded folds and a darker outline, nose pointing right (0°) so it can be
+ * rotated to follow a path. */
 function PaperPlane({ size = 34 }) {
+  const outline = "color-mix(in srgb, var(--accent) 45%, #1b1d23)";
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M2 4 22 12 2 20 6.5 12z" fill="var(--accent)" />
-      <path d="M6.5 12 22 12 2 20z" fill="rgba(0,0,0,.2)" />
-      <path d="M6.5 12H22" stroke="rgba(255,255,255,.55)" strokeWidth=".8" />
+    <svg width={size} height={size} viewBox="85 20 476 476" aria-hidden="true">
+      <g stroke={outline} strokeWidth="16" strokeLinejoin="round" style={{ stroke: outline }}>
+        <path d="M100 59 546 280 169 206z" style={{ fill: "var(--accent)" }} />
+        <path d="M169 206 546 280 190 273 101 335z" style={{ fill: "color-mix(in srgb, var(--accent) 80%, #000)" }} />
+        <path d="M190 273 216 347 101 335z" style={{ fill: "color-mix(in srgb, var(--accent) 58%, #000)" }} />
+        <path d="M190 273 546 280 260 456 216 347z" style={{ fill: "color-mix(in srgb, var(--accent) 88%, #fff)" }} />
+      </g>
     </svg>
   );
 }
