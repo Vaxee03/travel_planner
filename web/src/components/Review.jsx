@@ -3,6 +3,17 @@ import { uploadReviewPhoto, deleteReviewPhoto, mutateTrip } from "../lib/tripsAp
 import { useNicknames } from "../lib/useNicknames";
 import { reportError } from "../lib/errorReporting";
 import { DEFAULT_NICKNAME } from "../lib/users";
+import { shrinkImage, MAX_PHOTO_BYTES } from "../lib/imageResize";
+
+/** A failed upload/save in words a traveller understands (the raw Firebase
+ * message was shown before, e.g. "storage/unauthorized"). */
+function uploadErrorMessage(err) {
+  const code = err?.code || "";
+  if (!navigator.onLine || /retry-limit|network|unavailable/.test(code)) return "인터넷 연결이 불안정해 사진을 올리지 못했어요. 연결을 확인한 뒤 다시 시도해주세요.";
+  if (/unauthorized|permission/.test(code)) return "사진을 올릴 수 없어요. 사진 파일(10MB 이하)인지 확인하고, 계속 안 되면 새로고침 후 다시 시도해주세요.";
+  if (/quota/.test(code)) return "지금은 사진을 올릴 수 없어요. 잠시 후 다시 시도해주세요.";
+  return "사진을 올리지 못했어요. 잠시 후 다시 시도해주세요.";
+}
 
 export default function Review({ trip, uid, canReview, openModal, requestDelete }) {
   const [uploading, setUploading] = useState(false);
@@ -25,11 +36,21 @@ export default function Review({ trip, uid, canReview, openModal, requestDelete 
   const myPost = posts.find((r) => r.authorId === uid);
 
   async function handleFile(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
+    const picked = e.target.files?.[0];
+    if (!picked) return;
     setError(null);
+    if (picked.type && !picked.type.startsWith("image/")) {
+      setError("사진 파일(JPG, PNG 등)만 올릴 수 있어요.");
+      e.target.value = "";
+      return;
+    }
+    setUploading(true);
     try {
+      const file = await shrinkImage(picked);
+      if (file.size > MAX_PHOTO_BYTES) {
+        setError(`사진이 너무 커요(${(file.size / 1024 / 1024).toFixed(1)}MB). 10MB 이하 사진만 올릴 수 있어요.`);
+        return;
+      }
       const { url, path } = await uploadReviewPhoto(trip.id, uid, file);
       await mutateTrip(trip.id, (t) => {
         t.reviews = t.reviews || [];
@@ -39,7 +60,7 @@ export default function Review({ trip, uid, canReview, openModal, requestDelete 
       });
     } catch (err) {
       reportError(err, "review-photo-upload");
-      setError("사진 업로드에 실패했어요: " + (err?.message || "알 수 없는 오류"));
+      setError(uploadErrorMessage(err));
     } finally {
       setUploading(false);
       e.target.value = "";

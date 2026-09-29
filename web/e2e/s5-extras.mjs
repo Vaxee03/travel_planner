@@ -278,6 +278,32 @@ await tc("V-04", A3, "10MB 넘는 사진 업로드",
     return { actual: m ? `안내: "${m}"` : "아무 안내 없음", status: says ? "PASS" : "WARN", note: says ? "" : "용량 제한(10MB)을 넘으면 원인을 알려주지 않고 일반 오류만 표시 — 업로드 전에 크기를 확인해 안내하는 게 좋음" };
   });
 
+await tc("V-06", A3, "아주 큰 실제 사진(3000x3000, 20MB 이상) 업로드",
+  "노이즈로 채운 3000x3000 PNG(압축이 거의 안 되는 큰 사진) 업로드",
+  "올리기 전에 자동으로 줄여서 10MB 제한 안에서 업로드 성공",
+  async () => {
+    const bigReal = fileURLToPath(new URL("./shots/big-real.png", import.meta.url));
+    const dataUrl = await po.evaluate(async () => {
+      const c = document.createElement("canvas"); c.width = 3000; c.height = 3000;
+      const ctx = c.getContext("2d"); const img = ctx.createImageData(3000, 3000);
+      for (let i = 0; i < img.data.length; i += 4) { img.data[i] = Math.random() * 255; img.data[i + 1] = Math.random() * 255; img.data[i + 2] = Math.random() * 255; img.data[i + 3] = 255; }
+      ctx.putImageData(img, 0, 0);
+      return c.toDataURL("image/png");
+    });
+    fs.writeFileSync(bigReal, Buffer.from(dataUrl.split(",")[1], "base64"));
+    const mb = (fs.statSync(bigReal).size / 1024 / 1024).toFixed(1);
+    const before = (await fsGet(`trips/${PAST_ID}`)).reviews[0].photos.length;
+    const input = await po.$("input[type=file]");
+    await input.uploadFile(bigReal);
+    await waitFor(po, async () => true, { timeout: 1 });
+    const end = Date.now() + 60000;
+    let after = before;
+    while (Date.now() < end && after === before) { await wait(1000); after = ((await fsGet(`trips/${PAST_ID}`)).reviews[0].photos || []).length; }
+    const note = await po.evaluate(() => [...document.querySelectorAll(".note")].map((n) => n.innerText).join(" "));
+    assert(after === before + 1, `원본 ${mb}MB, 업로드 안 됨: ${note}`);
+    return `원본 ${mb}MB → 자동으로 줄여서 업로드 성공`;
+  });
+
 await tc("V-05", A3, "사진 삭제 / 후기 삭제",
   "내 사진의 ✕ → 후기 '삭제' → 확인",
   "사진·후기가 사라지고 저장소에서도 파일 삭제",
