@@ -442,11 +442,11 @@ await tc("T-24", A, "캘린더(.ics) 내보내기 — 확인 창과 파일 내�
     const events = (ics.match(/BEGIN:VEVENT/g) || []).length;
     const timed = (ics.match(/DTSTART:\d{8}T\d{6}/g) || []).length;
     const allDay = (ics.match(/DTSTART;VALUE=DATE:/g) || []).length;
-    const escaped = ics.includes("구로몬 시장\\; 점심\\, 타코야키");
+    const escaped = ics.split("\r\n ").join("").includes("구로몬 시장\\; 점심\\, 타코야키");
     const loc = /LOCATION:/.test(ics);
     const lineLong = ics.split("\r\n").some((l) => new TextEncoder().encode(l).length > 75);
     assert(events === nItems && escaped, JSON.stringify({ events, nItems, escaped }));
-    return { actual: `확인 창: "${q.split(String.fromCharCode(10)).filter(Boolean)[1]?.slice(0, 50)}…" / 이벤트 ${events}개(항목 ${nItems}개), 시간 ${timed}·종일 ${allDay}, 특수문자 이스케이프 OK, 위치 ${loc ? "포함" : "없음"}${lineLong ? ", 75바이트 넘는 줄 있음(줄 접기 미적용)" : ""}`, status: lineLong ? "WARN" : "PASS", note: lineLong ? "ICS 규격상 75바이트 초과 줄은 접어야 함 — 긴 한글 제목은 일부 캘린더 앱에서 잘릴 수 있음" : "" };
+    return { actual: `확인 창: "${q.split(String.fromCharCode(10)).map((l) => l.trim()).filter((l) => l.length > 6)[0]?.slice(0, 50)}…" / 이벤트 ${events}개(항목 ${nItems}개), 시간 ${timed}·종일 ${allDay}, 특수문자 이스케이프 OK, 위치 ${loc ? "포함" : "없음"}${lineLong ? ", 75바이트 넘는 줄 있음(줄 접기 미적용)" : ""}`, status: lineLong ? "WARN" : "PASS", note: lineLong ? "ICS 규격상 75바이트 초과 줄은 접어야 함 — 긴 한글 제목은 일부 캘린더 앱에서 잘릴 수 있음" : "" };
   });
 
 await tc("T-25", A, "일정이 하나도 없는 여행의 캘린더 내보내기",

@@ -25,6 +25,28 @@ function addDays(dateStr, n) {
   return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
 }
 
+/** RFC 5545 §3.1: content lines longer than 75 octets must be folded (CRLF
+ * + one space). Korean text is 3 bytes a character in UTF-8, so a long
+ * 일정 title easily passes that, and some calendar apps then cut it off.
+ * Splits on character boundaries so a character is never broken. */
+function foldLine(line) {
+  const enc = new TextEncoder();
+  if (enc.encode(line).length <= 75) return line;
+  const parts = [];
+  let cur = "";
+  let curBytes = 0;
+  for (const ch of line) {
+    const b = enc.encode(ch).length;
+    // continuation lines start with a space, which counts toward the 75
+    const limit = parts.length === 0 ? 75 : 74;
+    if (curBytes + b > limit) { parts.push(cur); cur = ""; curBytes = 0; }
+    cur += ch;
+    curBytes += b;
+  }
+  parts.push(cur);
+  return parts.join("\r\n ");
+}
+
 /** Builds an RFC5545 .ics calendar from a trip's days/items. Timed items
  * ("time" kind) become 1-hour events; untimed items ("label" kind, e.g.
  * "이동") become all-day events since there's no clock time to anchor them. */
@@ -54,7 +76,7 @@ export function buildTripIcs(trip) {
   });
 
   lines.push("END:VCALENDAR");
-  return lines.join("\r\n");
+  return lines.map(foldLine).join("\r\n");
 }
 
 export function downloadTripIcs(trip) {
