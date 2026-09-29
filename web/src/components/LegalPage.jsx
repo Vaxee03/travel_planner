@@ -1,5 +1,3 @@
-import { Link } from "react-router-dom";
-
 // ⚠️ Written as a starting point, not legal advice — have it reviewed
 // before a store launch.
 const OPERATOR = "초보개발자";
@@ -10,7 +8,6 @@ const EFFECTIVE_DATE = "2026년 10월 1일";
 function Page({ title, children }) {
   return (
     <article className="legal">
-      <Link className="back-link" to="/">← 여행 플래너로</Link>
       <h1>{title}</h1>
       <p className="section-note">시행일: {EFFECTIVE_DATE}</p>
       {children}

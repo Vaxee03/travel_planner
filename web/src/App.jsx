@@ -520,7 +520,7 @@ export default function App() {
             <h1><Link to={user ? "/about" : "/"} className="brand-link">여행 플래너</Link></h1>
             <div className="subline">여러 여행을 관리하고, 다녀온 여행엔 후기와 사진을 남겨보세요.</div>
           </div>
-          <div className="btn-row" style={{ alignItems: "center", ...(!user && loginPage ? { alignSelf: "flex-end" } : null) }}>
+          <div className="btn-row" style={{ alignItems: "center", ...(!user && (loginPage || legalPage) ? { alignSelf: "flex-end" } : null) }}>
             {!user && loginPage && (
               // Back to wherever they came from inside the site (usually the
               // landing page); a direct visit to /login has nothing to go back
@@ -534,12 +534,23 @@ export default function App() {
                 ← 뒤로가기
               </button>
             )}
-            {user && (
-              <span className="btn-row" style={{ alignItems: "center" }}>
-                <span style={{ color: "var(--nickname)", fontSize: 15, fontWeight: 700 }}>{nickname || "닉네임 없음"}</span>
-                <button className="btn btn-sm" onClick={() => setModal({ type: "edit-nickname", currentNickname: nickname })}>닉네임 수정</button>
-                <button className="btn btn-sm" onClick={signOutUser}>로그아웃</button>
-              </span>
+            {(user || legalPage) && (
+              <div className="top-right-stack">
+                {user && (
+                  <span className="btn-row" style={{ alignItems: "center" }}>
+                    <span style={{ color: "var(--nickname)", fontSize: 15, fontWeight: 700 }}>{nickname || "닉네임 없음"}</span>
+                    <button className="btn btn-sm" onClick={() => setModal({ type: "edit-nickname", currentNickname: nickname })}>닉네임 수정</button>
+                    <button className="btn btn-sm" onClick={signOutUser}>로그아웃</button>
+                  </span>
+                )}
+                {legalPage && (
+                  // Terms/privacy are reached from the landing page's footer,
+                  // so "back" always means the landing page (/about when signed in).
+                  <Link className="back-link" style={{ marginBottom: 0, fontSize: 16.5 }} to={user ? "/about" : "/"}>
+                    ← 뒤로가기
+                  </Link>
+                )}
+              </div>
             )}
           </div>
         </div>
