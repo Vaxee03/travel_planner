@@ -740,7 +740,11 @@ function DestinationField({ tripType, defaultValue }) {
       const r = inputRef.current?.getBoundingClientRect();
       if (!r) return;
       const top = r.bottom + 4;
-      setListPos({ top, left: r.left, width: r.width, maxHeight: Math.max(160, window.innerHeight - top - 12) });
+      // The list is portalled to <body>, outside the page's desktop zoom
+      // (.page in app.css): give it the same zoom so it matches the input,
+      // and convert the on-screen rect into its zoomed CSS pixels.
+      const z = inputRef.current.currentCSSZoom || 1;
+      setListPos({ top: top / z, left: r.left / z, width: r.width / z, maxHeight: Math.max(160, window.innerHeight - top - 12) / z, zoom: z });
     }
     place();
     window.addEventListener("scroll", place, true);
@@ -893,7 +897,7 @@ function DestinationField({ tripType, defaultValue }) {
         <div
           role="listbox"
           style={{
-            position: "fixed", top: listPos.top, left: listPos.left, width: listPos.width,
+            position: "fixed", top: listPos.top, left: listPos.left, width: listPos.width, zoom: listPos.zoom,
             maxHeight: listPos.maxHeight, overflowY: "auto", zIndex: 60,
             background: "var(--surface)",
             border: "1px solid var(--line)", borderRadius: 10,

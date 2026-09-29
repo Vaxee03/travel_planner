@@ -54,6 +54,15 @@ body{
   line-height:1.6; margin:0; padding:56px 20px 100px;
 }
 .page{ max-width:820px; margin:0 auto; }
+/* On wide screens the app matches the landing page's scale: everything
+   (text, buttons, spacing) is 15% larger, and the column is 1120px on
+   screen — the landing's content width — i.e. 974px before the zoom. */
+@media (min-width:1024px){
+  .page{ zoom:1.15; max-width:974px; }
+  /* Google Maps misplaces clicks inside a zoomed element, so maps undo the
+     zoom (1 / 1.15) and take a taller box to keep the same on-screen size. */
+  .page .map-picker-map{ zoom:0.8696; height:414px; border-radius:14px; }
+}
 .nums{ font-variant-numeric:tabular-nums; }
 [hidden]{ display:none !important; }
 button{ font:inherit; color:inherit; }
