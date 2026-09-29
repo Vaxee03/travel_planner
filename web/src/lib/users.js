@@ -1,10 +1,9 @@
 // Account-level nicknames, stored separately from trip documents so the same
 // nickname follows a user across every trip they're a member of.
 import { doc, getDoc, setDoc, getDocs, onSnapshot, collection, query, where, documentId } from "firebase/firestore";
-import { db } from "./firebase";
+import { db } from "./db";
 
-export const DEFAULT_NICKNAME = "이름 없는 동행자";
-export const NICKNAME_MAX = 20;
+export { DEFAULT_NICKNAME, NICKNAME_MAX } from "./nickname";
 
 const cache = new Map();
 

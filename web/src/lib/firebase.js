@@ -1,5 +1,4 @@
 import { initializeApp } from "firebase/app";
-import { initializeFirestore, persistentLocalCache, persistentSingleTabManager, connectFirestoreEmulator } from "firebase/firestore";
 import {
   getAuth, onAuthStateChanged, connectAuthEmulator, signInWithCustomToken, signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -22,33 +21,17 @@ const firebaseConfig = {
 
 export const firebaseReady = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
 
-const useEmulators = import.meta.env.VITE_USE_EMULATORS === "1";
+export const useEmulators = import.meta.env.VITE_USE_EMULATORS === "1";
 
-let app, db, auth;
+// Firestore lives in ./db.js (loaded only once someone is signed in).
+let app, auth;
 if (firebaseReady) {
   app = initializeApp(firebaseConfig);
-  // Named Firestore database (Firebase console lets you create one with a
-  // custom id instead of "(default)" — set VITE_FIREBASE_DATABASE_ID if so).
-  const databaseId = import.meta.env.VITE_FIREBASE_DATABASE_ID;
-  // Persists reads to IndexedDB so trips already opened once are still
-  // readable offline (PWA offline support relies on this, not just the
-  // service worker caching static assets).
-  // Single-tab, not multi-tab: with a shared multi-tab cache only one "primary"
-  // tab talks to the server, using *its* sign-in — so when "로그인 상태 유지"
-  // is off and two tabs are signed in to different accounts, the other tab's
-  // reads/writes went out under the wrong account and failed with
-  // permission-denied. Now the first tab owns the offline cache and any other
-  // tab falls back to an in-memory cache with its own connection.
-  const firestoreSettings = { localCache: persistentLocalCache({ tabManager: persistentSingleTabManager() }) };
-  db = databaseId
-    ? initializeFirestore(app, firestoreSettings, databaseId)
-    : initializeFirestore(app, firestoreSettings);
   auth = getAuth(app);
   // Local-only: `VITE_USE_EMULATORS=1 npm run dev` points everything at the
   // Firebase emulators (firebase emulators:start) instead of production.
   if (useEmulators) {
     connectAuthEmulator(auth, "http://127.0.0.1:9299", { disableWarnings: true });
-    connectFirestoreEmulator(db, "127.0.0.1", 8080);
     // Test hook: sign in as an arbitrary fake user via an unsigned custom
     // token, which only the Auth emulator accepts. Never exists in prod builds.
     window.__emulatorSignIn = (uid) => {
@@ -67,7 +50,7 @@ if (firebaseReady) {
   );
 }
 
-export { db, auth };
+export { app, auth };
 
 // Cloud Functions and Storage SDKs are only needed for a few actions (AI
 // recs, photos, public links, account deletion, error reports), so they're

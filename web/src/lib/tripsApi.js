@@ -6,7 +6,8 @@ import {
   collection, doc, onSnapshot, addDoc, deleteDoc, updateDoc,
   arrayUnion, arrayRemove, deleteField, serverTimestamp, query, where, runTransaction,
 } from "firebase/firestore";
-import { db, callFunction, loadStorage } from "./firebase";
+import { callFunction, loadStorage } from "./firebase";
+import { db } from "./db";
 import { emptyTrip } from "./utils";
 
 const tripsCol = () => collection(db, "trips");
