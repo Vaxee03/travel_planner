@@ -30,14 +30,14 @@ function Field({ name, label, type = "text", placeholder, required, defaultValue
  * one member to assign to, since a solo trip has no one to tag. Left
  * unselected by default; the checklist item only ever shows a nickname tag
  * when someone explicitly picks a name here. */
-function AssigneeField({ trip }) {
+function AssigneeField({ trip, defaultValue = "" }) {
   const memberIds = trip?.memberIds || [];
   const nicknames = useNicknames(memberIds);
   if (memberIds.length <= 1) return null;
   return (
     <div className="field">
       <label>담당자 (선택)</label>
-      <select name="assignedTo" defaultValue="">
+      <select name="assignedTo" defaultValue={defaultValue}>
         <option value="">선택 안 함</option>
         {memberIds.map((uid) => (
           <option key={uid} value={uid}>{nicknames[uid] || DEFAULT_NICKNAME}</option>
@@ -488,14 +488,16 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit: 
         <Actions submitLabel={isEdit ? "저장" : "추가"} onClose={onClose} />
       </form>
     );
-  } else if (modal.type === "add-check") {
+  } else if (modal.type === "add-check" || modal.type === "edit-check") {
+    const isEdit = modal.type === "edit-check";
+    const c = isEdit ? seenTrip.checklist[modal.idx] : { text: "", assignedTo: "" };
     content = (
       <form onSubmit={handleSubmit} noValidate>
-        <h3>준비물 추가</h3>
-        <Field name="text" label="항목" placeholder="예: 온천용 수건" required />
-        <AssigneeField trip={trip} />
+        <h3>{isEdit ? "준비물 수정" : "준비물 추가"}</h3>
+        <Field name="text" label="항목" placeholder="예: 온천용 수건" required defaultValue={c.text} />
+        <AssigneeField trip={trip} defaultValue={c.assignedTo || ""} />
         <FormNote message={formError} />
-        <Actions submitLabel="추가" onClose={onClose} />
+        <Actions submitLabel={isEdit ? "저장" : "추가"} onClose={onClose} />
       </form>
     );
   } else if (modal.type === "add-booking" || modal.type === "edit-booking") {

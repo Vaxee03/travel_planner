@@ -352,13 +352,18 @@ await tc("K-02", A3, "준비물 추가 (담당자 지정) / 삭제",
     return items.join(" | ");
   });
 
-await tc("K-03", A3, "준비물 이름 수정",
-  "체크리스트 항목의 버튼 확인",
-  "잘못 입력한 준비물을 고칠 수 있어야 함",
+await tc("K-03", A3, "준비물 이름·담당자 수정",
+  "민수: '여권'(서연이 체크해 둔 항목) '수정' → 이름 '여권 + 사본', 담당자 서연 → 저장",
+  "이름·담당자가 바뀌고 체크 상태는 그대로 유지",
   async () => {
-    const btns = await po.evaluate(() => [...document.querySelectorAll(".check-item button")].map((b) => b.innerText).filter(Boolean));
-    const canEdit = btns.some((b) => b.includes("수정"));
-    return { actual: `항목 버튼: ${[...new Set(btns)].join(", ")}`, status: canEdit ? "PASS" : "WARN", note: canEdit ? "" : "체크리스트는 수정 기능이 없어 오타가 나면 지우고 다시 만들어야 함" };
+    await po.evaluate(() => { const row = [...document.querySelectorAll(".check-item")].find((c) => c.innerText.includes("여권")); [...row.querySelectorAll("button")].find((b) => b.innerText === "수정").click(); });
+    await waitFor(po, () => !!document.querySelector(".modal input[name=text]"), { label: "edit form" });
+    await fill(po, { text: "여권 + 사본", assignedTo: C });
+    await submitModal(po);
+    await wait(1000);
+    const row = await po.evaluate(() => { const r = [...document.querySelectorAll(".check-item")].find((c) => c.innerText.includes("여권 + 사본")); return r ? { txt: r.innerText.split(String.fromCharCode(10)).join(" "), done: r.classList.contains("done") } : null; });
+    assert(row && row.txt.includes("서연") && row.done, JSON.stringify(row));
+    return `"${row.txt}" (체크 유지)`;
   });
 
 // ---- bookings --------------------------------------------------------------

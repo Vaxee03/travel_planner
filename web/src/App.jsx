@@ -442,6 +442,20 @@ export default function App() {
       closeModal();
       return;
     }
+    if (m.type === "edit-check") {
+      const seen = seenTrip.checklist[m.idx];
+      await runMutation(() => mutateTrip(tripId, (t) => {
+        const idx = seen.id ? t.checklist.findIndex((c) => c.id === seen.id) : locateItem(t.checklist, m.idx, seen);
+        if (idx < 0) throw new StaleEditError();
+        // Same id, so its checked state (checklistDone[id]) carries over.
+        const item = { ...t.checklist[idx], text: values.text };
+        if (values.assignedTo) item.assignedTo = values.assignedTo;
+        else delete item.assignedTo;
+        t.checklist[idx] = item;
+      }));
+      closeModal();
+      return;
+    }
     if (m.type === "add-check") {
       await mutateTrip(tripId, (t) => {
         // Backfill ids onto any pre-existing legacy items in the same write —

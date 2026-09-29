@@ -26,7 +26,10 @@ export default function Checklist({ trip, openModal, requestDelete, toggleCheck,
                   <span className="section-note" style={{ flexShrink: 0 }}>👤 {nicknames[it.assignedTo] || "이름 없는 동행자"}</span>
                 )}
                 {canEdit && (
-                  <button className="btn-ghost btn-sm btn-danger" onClick={() => requestDelete("delete-check", "이 항목을 삭제할까요?", { idx })}>삭제</button>
+                  <>
+                    <button className="btn-ghost btn-sm" onClick={() => openModal({ type: "edit-check", idx })}>수정</button>
+                    <button className="btn-ghost btn-sm btn-danger" onClick={() => requestDelete("delete-check", "이 항목을 삭제할까요?", { idx })}>삭제</button>
+                  </>
                 )}
               </div>
             );
