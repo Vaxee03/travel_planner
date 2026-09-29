@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useJsApiLoader } from "@react-google-maps/api";
-import { fmtDate, itemKind, FormError } from "../lib/utils";
+import { fmtDate, itemKind, FormError, datesInRange } from "../lib/utils";
 import { MAPS_LOADER_OPTIONS } from "../lib/mapsLoader";
 import { fetchCitySuggestions, findPlaceLocation, INTERNATIONAL_REGION_CODES } from "../lib/placeSearch";
 import { EXTRA_INTERNATIONAL_DESTINATIONS } from "../lib/extraDestinations";
@@ -402,11 +402,16 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit: 
     );
   } else if (modal.type === "add-day" || modal.type === "edit-day") {
     const isEdit = modal.type === "edit-day";
-    const d = isEdit ? seenTrip.days[modal.idx] : { date: "", status: "open", summary: "" };
+    const taken = new Set((seenTrip.days || []).map((x) => x.date));
+    const firstFree = datesInRange(seenTrip.startDate, seenTrip.endDate).find((x) => !taken.has(x)) || "";
+    const d = isEdit ? seenTrip.days[modal.idx] : { date: firstFree, status: "open", summary: "" };
     content = (
       <form onSubmit={handleSubmit} noValidate>
         <h3>{isEdit ? "날짜 수정" : "날짜 추가"}</h3>
-        <Field name="date" label="날짜" type="date" required defaultValue={d.date} />
+        <div className="field">
+          <label>날짜</label>
+          <input name="date" type="date" required defaultValue={d.date} min={seenTrip.startDate || undefined} max={seenTrip.endDate || undefined} />
+        </div>
         <div className="field">
           <label>상태</label>
           <select name="status" defaultValue={d.status}>
@@ -596,6 +601,20 @@ function TripForm({ isEdit, t, trips, onSubmit, onClose, saveError }) {
         <Field name="travelers" label="인원 수" type="number" placeholder="예: 2" min={1} required defaultValue={t.travelers || 1} />
         <Field name="budgetTotal" label="총 예산 (원)" type="number" placeholder="예: 1000000" defaultValue={t.budgetTotal} />
       </div>
+      {isEdit && (t.days || []).length > 0 && (startDate !== t.startDate || endDate !== t.endDate) && (
+        <label className="field" style={{ display: "flex", alignItems: "flex-start", gap: 8, fontWeight: 400, color: "var(--ink)" }}>
+          <input type="checkbox" name="moveDays" defaultChecked style={{ width: "auto", marginTop: 5, flexShrink: 0 }} />
+          <span>
+            일정 날짜도 함께 옮기기
+            <span style={{ display: "block", fontSize: 13, color: "var(--ink-soft)" }}>
+              {startDate && t.startDate && startDate !== t.startDate
+                ? `기존 일정을 ${Math.abs(Math.round((Date.parse(startDate) - Date.parse(t.startDate)) / 86400000))}일 ${startDate > t.startDate ? "뒤로" : "앞으로"} 옮기고, `
+                : ""}
+              새 기간에 없는 날짜는 빈 날짜로 추가해요.
+            </span>
+          </span>
+        </label>
+      )}
       {!isEdit && checklistSources.length > 0 && (
         <div className="field">
           <label>체크리스트</label>

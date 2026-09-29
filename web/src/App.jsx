@@ -7,6 +7,7 @@ import { randomNickname } from "./lib/randomNickname";
 import {
   checklistItemId, copyChecklist, daysBetween, ensureChecklistIds, makeChecklistId, shiftDate,
   locateDay, locateItem, stableStringify, StaleEditError, FormError, fmtDate, normalizeLink,
+  datesInRange, emptyDay, outsideTrip,
 } from "./lib/utils";
 import { computePerms, PERMISSION_CATEGORIES } from "./lib/permissions";
 import Home from "./components/Home";
@@ -314,6 +315,7 @@ export default function App() {
         travelers: Number(values.travelers) || 1,
         budgetTotal: Number(values.budgetTotal) || 0,
         tripType: values.tripType === "domestic" ? "domestic" : "international",
+        days: datesInRange(values.startDate, values.endDate).map(emptyDay),
       };
       const source = values.checklistFrom ? getTrip(trips, values.checklistFrom) : null;
       if (source) fields.checklist = copyChecklist(source.checklist);
@@ -345,6 +347,17 @@ export default function App() {
     }
     if (m.type === "edit-trip") {
       await mutateTrip(tripId, (t) => {
+        if (values.moveDays === "on") {
+          // Keep each day's place in the trip (day 1 stays day 1), then add
+          // an empty day for any date of the new range that has none. Days
+          // that fall outside the new range are kept (marked in the list).
+          const offset = t.startDate && values.startDate ? daysBetween(t.startDate, values.startDate) : 0;
+          const days = (t.days || []).map((d) => ({ ...d, date: shiftDate(d.date, offset) }));
+          const have = new Set(days.map((d) => d.date));
+          datesInRange(values.startDate, values.endDate).forEach((date) => { if (!have.has(date)) days.push(emptyDay(date)); });
+          days.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+          t.days = days;
+        }
         t.title = values.title; t.destination = values.destination;
         t.startDate = values.startDate; t.endDate = values.endDate;
         t.travelers = Number(values.travelers) || 1;
@@ -360,6 +373,7 @@ export default function App() {
         // Days are looked up by date everywhere, so two days with the same
         // date would send edits on the second one to the first.
         if (t.days.some((d) => d.date === values.date)) throw new FormError(`${fmtDate(values.date)}은(는) 이미 있는 날짜예요. 그 날짜에 항목을 추가해주세요.`);
+        if (outsideTrip(t, values.date)) throw new FormError(`여행 기간(${t.startDate} ~ ${t.endDate}) 밖의 날짜예요. 먼저 '여행 정보 수정'에서 기간을 바꿔주세요.`);
         t.days.push({ date: values.date, status: values.status, summary: values.summary, items: [] });
         t.days.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
       });
@@ -371,6 +385,7 @@ export default function App() {
       await runMutation(() => mutateTrip(tripId, (t) => {
         const d = t.days[locateDay(t.days, date)];
         if (values.date !== date && t.days.some((x) => x.date === values.date)) throw new FormError(`${fmtDate(values.date)}은(는) 이미 있는 날짜예요.`);
+        if (values.date !== date && outsideTrip(t, values.date)) throw new FormError(`여행 기간(${t.startDate} ~ ${t.endDate}) 밖의 날짜예요.`);
         d.date = values.date; d.status = values.status; d.summary = values.summary;
         t.days.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
       }));

@@ -95,8 +95,29 @@ export function daysBetween(fromIso, toIso) {
   return Math.round((Date.parse(toIso + "T00:00:00Z") - Date.parse(fromIso + "T00:00:00Z")) / 86400000);
 }
 
+/** Today's date on the user's own calendar. (toISOString() is UTC, which in
+ * Korea stays on yesterday until 9 AM — D-day, trip status and the review
+ * unlock were a day behind every morning.) */
 export function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+/** Every date from start to end inclusive; empty if either is missing, the
+ * range is backwards, or it's implausibly long (> 90 days). */
+export function datesInRange(start, end) {
+  if (!start || !end || end < start) return [];
+  const n = daysBetween(start, end);
+  if (n > 90) return [];
+  return Array.from({ length: n + 1 }, (_, i) => shiftDate(start, i));
+}
+
+export const emptyDay = (date) => ({ date, status: "open", summary: "", items: [] });
+
+/** Whether an itinerary date falls outside the trip's start–end range. */
+export function outsideTrip(trip, date) {
+  return Boolean(date && ((trip.startDate && date < trip.startDate) || (trip.endDate && date > trip.endDate)));
 }
 
 export function fmtDate(iso) {

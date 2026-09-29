@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { fmtDate, mapUrl, routeStops, splitItems, stableStringify } from "../lib/utils";
+import { fmtDate, mapUrl, outsideTrip, routeStops, splitItems, stableStringify } from "../lib/utils";
 import { mutateTrip } from "../lib/tripsApi";
 
 export default function Itinerary({ trip, dayIdx, setDayIdx, openModal, requestDelete, reorderDayItems, canEdit }) {
@@ -42,7 +42,10 @@ export default function Itinerary({ trip, dayIdx, setDayIdx, openModal, requestD
                   <button className="day-summary" onClick={() => setDayIdx(idx)}>
                     <div className="day-top">
                       <div className="day-title"><span className="day-date nums">{fmtDate(d.date)}</span></div>
-                      <span className={"status " + cls}>{cls === "confirmed" ? "확정" : "자유일정"}</span>
+                      <span className="btn-row" style={{ gap: 6 }}>
+                        {outsideTrip(trip, d.date) && <span className="status open" style={{ color: "var(--danger)" }} title="여행 기간 밖의 날짜예요">기간 밖</span>}
+                        <span className={"status " + cls}>{cls === "confirmed" ? "확정" : "자유일정"}</span>
+                      </span>
                     </div>
                     <div className="day-summary-body">
                       <span className={"day-summary-text" + (d.summary ? "" : " muted")}>{d.summary || "세부 계획 미정"}</span>

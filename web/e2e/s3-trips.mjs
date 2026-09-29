@@ -141,19 +141,24 @@ const TRIP = () => `${BASE}/trip/${trip.id}`;
 await p.goto(TRIP() + "/itinerary", { waitUntil: "domcontentloaded" });
 await waitFor(p, () => !!document.querySelector(".tabbar"), { label: "trip detail" });
 
-await tc("T-10", A, "날짜 추가 (순서 자동 정렬)",
-  "'+ 날짜 추가'로 출발일+1(확정, 요약 '둘째 날') → 출발일(자유일정) 순서로 추가",
-  "일정 목록이 날짜순으로 정렬되어 2개 표시",
+await tc("T-10", A, "새 여행 — 기간만큼 날짜 자동 생성 + 날짜 수정",
+  "만든 여행(3박 4일)의 일정 탭 확인 → 첫째 날을 '확정', 요약 '첫째 날'로, 둘째 날 요약 '둘째 날'로 수정",
+  "출발일~종료일 4개 날짜가 자동으로 만들어져 있고, 수정 내용이 날짜순 목록에 반영",
   async () => {
-    for (const [off, status, summary] of [[11, "confirmed", "둘째 날"], [10, "open", "첫째 날"]]) {
-      await click(p, "button", "+ 날짜 추가");
-      await fill(p, { date: isoDay(off), status, summary });
+    const days0 = await p.evaluate(() => document.querySelectorAll(".day-summary").length);
+    for (const [i, status, summary] of [[0, "open", "첫째 날"], [1, "confirmed", "둘째 날"]]) {
+      await p.evaluate((i) => document.querySelectorAll(".day-summary")[i].click(), i);
+      await click(p, ".detail-head button", "날짜 수정");
+      await fill(p, { status, summary });
       await submitModal(p);
       await waitFor(p, () => !document.querySelector(".modal"), { label: "day saved" });
+      await click(p, ".back-link", "일정 목록으로");
     }
-    const days = await p.evaluate(() => [...document.querySelectorAll(".day-summary")].map((d) => d.innerText.replace(/\n/g, " ")));
-    assert(days.length === 2 && days[0].includes("첫째 날") && days[1].includes("확정"), days.join(" || "));
-    return days.join(" || ");
+    const days = await p.evaluate(() => [...document.querySelectorAll(".day-summary")].map((d) => d.innerText.split(String.fromCharCode(10)).join(" ")));
+    const t = await fsGet(`trips/${trip.id}`);
+    const auto = t.days.map((d) => d.date).join(",") === [10, 11, 12, 13].map(isoDay).join(",");
+    assert(days0 === 4 && auto && days[0].includes("첫째 날") && days[1].includes("확정"), days.join(" || "));
+    return `자동 생성 ${days0}개(${t.days[0].date}~${t.days[3].date}) / ${days.slice(0, 2).join(" || ")}`;
   });
 
 await tc("T-11", A, "여행 기간 밖의 날짜 추가",
