@@ -296,6 +296,7 @@ body.lp-body{ padding:0; }
   .lp-invite-title{ font-size:28px; }
   .lp-final-inner{ padding:56px 20px; border-radius:22px; }
   .lp-copy{ margin-left:0; width:100%; }
-  /* the winding scroll path would cross the single-column content */
-  .lp-flight-journey{ display:none; }
+  /* phones: fainter trail (the path hugs the side margins, see PHONE_JOURNEY_PATH) */
+  .lp-flight-journey{ z-index:2; } /* above the stacked cards, or the plane vanishes behind them */
+  .lp-flight-journey .lp-trail{ opacity:.25; }
 }

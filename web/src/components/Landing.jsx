@@ -561,6 +561,21 @@ function useSmoothJump(reduce) {
 
 const HERO_PATH = "M-60 330 C 160 380, 300 140, 500 190 S 780 360, 1060 40";
 const JOURNEY_PATH = "M88 0 C 88 70, 6 80, 6 190 S 94 330, 94 440 S 6 600, 6 700 S 90 830, 90 900 S 50 960, 50 1000";
+// Phones stack everything in one column, so the plane mostly rides the side
+// margins there and only darts across a couple of times.
+const PHONE_JOURNEY_PATH = "M94 0 C 96 80, 96 160, 94 230 C 91 250, 9 255, 6 275 C 4 360, 4 460, 6 540 C 9 560, 91 565, 94 585 C 96 690, 96 800, 94 880 C 90 930, 62 970, 50 1000";
+
+function useIsPhone() {
+  const query = "(max-width: 600px)";
+  const [phone, setPhone] = useState(() => typeof window !== "undefined" && window.matchMedia(query).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const onChange = () => setPhone(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return phone;
+}
 
 export default function Landing({ signedIn = false, nickname = "" }) {
   // Signed-in visitors (via the app's header logo → /about) get buttons back
@@ -569,6 +584,7 @@ export default function Landing({ signedIn = false, nickname = "" }) {
   const startLabel = signedIn ? "내 여행으로 가기" : "무료로 시작하기";
   const reduce = useReducedMotion();
   const jump = useSmoothJump(reduce);
+  const isPhone = useIsPhone();
 
   // The app's normal page padding would frame the full-bleed sections.
   useEffect(() => {
@@ -640,7 +656,7 @@ export default function Landing({ signedIn = false, nickname = "" }) {
 
         <div className="lp-journey" ref={journeyRef}>
           {!reduce && (
-            <FlightPath d={JOURNEY_PATH} viewBox={{ w: 100, h: 1000 }} progress={journeyProgress} boxRef={journeyRef} className="lp-flight lp-flight-journey" maskId="lp-journey-mask" planeSize={46} />
+            <FlightPath key={isPhone ? "phone" : "wide"} d={isPhone ? PHONE_JOURNEY_PATH : JOURNEY_PATH} viewBox={{ w: 100, h: 1000 }} progress={journeyProgress} boxRef={journeyRef} className="lp-flight lp-flight-journey" maskId="lp-journey-mask" planeSize={isPhone ? 32 : 46} />
           )}
 
           <section className="lp-section" id="features">
