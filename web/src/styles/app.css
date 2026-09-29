@@ -232,6 +232,7 @@ section{ margin-bottom:44px; }
 @media (max-width:560px){ .checklist{ grid-template-columns:1fr; } }
 .check-item{ display:flex; align-items:center; flex-wrap:wrap; gap:6px 10px; background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:11px 12px; font-size:15.5px; }
 .check-item button.box-btn{ all:unset; cursor:pointer; flex:0 0 auto; }
+.check-item button.box-btn:focus-visible .box{ outline:2px solid var(--accent); outline-offset:2px; }
 .box{ width:18px; height:18px; border-radius:5px; border:1.5px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:13.5px; color:#fff; }
 .check-item.done .box{ border-color:var(--confirmed); background:var(--confirmed); }
 .check-item.done .check-text{ color:var(--ink-soft); text-decoration:line-through; }

@@ -18,8 +18,14 @@ export default function Checklist({ trip, openModal, requestDelete, toggleCheck,
             const done = trip.checklistDone?.[checklistItemId(it, idx)] ?? it.done ?? false;
             return (
               <div className={"check-item" + (done ? " done" : "")} key={checklistItemId(it, idx)}>
-                <button className="box-btn" onClick={() => toggleCheck(idx)}>
-                  <span className="box">{done ? "✓" : ""}</span>
+                <button
+                  className="box-btn"
+                  role="checkbox"
+                  aria-checked={done}
+                  aria-label={`${it.text} 완료`}
+                  onClick={() => toggleCheck(idx)}
+                >
+                  <span className="box" aria-hidden="true">{done ? "✓" : ""}</span>
                 </button>
                 <span className="check-text">{it.text}</span>
                 {it.assignedTo && (
