@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, connectFirestoreEmulator } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentSingleTabManager, connectFirestoreEmulator } from "firebase/firestore";
 import {
   getAuth, onAuthStateChanged, connectAuthEmulator, signInWithCustomToken, signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -33,7 +33,13 @@ if (firebaseReady) {
   // Persists reads to IndexedDB so trips already opened once are still
   // readable offline (PWA offline support relies on this, not just the
   // service worker caching static assets).
-  const firestoreSettings = { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) };
+  // Single-tab, not multi-tab: with a shared multi-tab cache only one "primary"
+  // tab talks to the server, using *its* sign-in — so when "로그인 상태 유지"
+  // is off and two tabs are signed in to different accounts, the other tab's
+  // reads/writes went out under the wrong account and failed with
+  // permission-denied. Now the first tab owns the offline cache and any other
+  // tab falls back to an in-memory cache with its own connection.
+  const firestoreSettings = { localCache: persistentLocalCache({ tabManager: persistentSingleTabManager() }) };
   db = databaseId
     ? initializeFirestore(app, firestoreSettings, databaseId)
     : initializeFirestore(app, firestoreSettings);
