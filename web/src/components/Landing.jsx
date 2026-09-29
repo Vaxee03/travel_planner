@@ -562,7 +562,11 @@ function useSmoothJump(reduce) {
 const HERO_PATH = "M-60 330 C 160 380, 300 140, 500 190 S 780 360, 1060 40";
 const JOURNEY_PATH = "M88 0 C 88 70, 6 80, 6 190 S 94 330, 94 440 S 6 600, 6 700 S 90 830, 90 900 S 50 960, 50 1000";
 
-export default function Landing() {
+export default function Landing({ signedIn = false }) {
+  // Signed-in visitors (via the app's header logo → /about) get buttons back
+  // to their trips instead of the sign-up prompts.
+  const startTo = signedIn ? "/" : "/login";
+  const startLabel = signedIn ? "내 여행으로 가기" : "무료로 시작하기";
   const reduce = useReducedMotion();
   const jump = useSmoothJump(reduce);
 
@@ -599,8 +603,8 @@ export default function Landing() {
             <a href="#steps" onClick={jump}>시작 방법</a>
           </div>
           <div className="lp-nav-cta">
-            <Link to="/login" className="btn btn-ghost">로그인</Link>
-            <Link to="/login" className="btn btn-primary btn-sm">무료로 시작하기</Link>
+            {!signedIn && <Link to="/login" className="btn btn-ghost">로그인</Link>}
+            <Link to={startTo} className="btn btn-primary btn-sm">{signedIn ? "내 여행으로" : "무료로 시작하기"}</Link>
           </div>
         </nav>
 
@@ -619,7 +623,7 @@ export default function Landing() {
               일정, 동선 지도, 예산과 정산, 체크리스트까지. 초대 링크 하나로 동행자와 실시간으로 같이 계획해요.
             </motion.p>
             <motion.div className="lp-hero-cta" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease: EASE, delay: 0.24 }}>
-              <Link to="/login" className="btn btn-primary lp-btn-lg">무료로 시작하기</Link>
+              <Link to={startTo} className="btn btn-primary lp-btn-lg">{startLabel}</Link>
               <a href="#features" className="btn lp-btn-lg" onClick={jump}>기능 둘러보기</a>
             </motion.div>
             <motion.div className="lp-hero-meta" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.7, delay: 0.4 }}>
@@ -715,7 +719,7 @@ export default function Landing() {
             </motion.div>
             <h2>다음 여행, 지금 같이 계획해볼까요?</h2>
             <p>가입은 무료예요. 여행을 하나 만들고 친구에게 링크를 보내보세요.</p>
-            <Link to="/login" className="btn btn-primary lp-btn-lg">무료로 시작하기</Link>
+            <Link to={startTo} className="btn btn-primary lp-btn-lg">{startLabel}</Link>
           </Reveal>
         </section>
 

@@ -91,7 +91,8 @@ export default function App() {
   // Any other path (typo, old bookmark) just falls back to the trip list.
   const legalPage = location.pathname === "/terms" ? "terms" : location.pathname === "/privacy" ? "privacy" : null;
   const loginPage = location.pathname === "/login";
-  const knownPath = Boolean(location.pathname === "/" || loginPage || tripMatch || joinMatch || shareMatch || legalPage);
+  const aboutPage = location.pathname === "/about";
+  const knownPath = Boolean(location.pathname === "/" || loginPage || aboutPage || tripMatch || joinMatch || shareMatch || legalPage);
   useEffect(() => {
     if (!knownPath) navigate("/", { replace: true });
   }, [knownPath, navigate]);
@@ -457,12 +458,14 @@ export default function App() {
   // Signed-out visitors at "/" get the full-width landing page instead of the
   // app shell (the login form lives at /login). Until auth is known, render
   // nothing there so a signed-in user doesn't see the landing flash by.
-  const onLandingPath = location.pathname === "/" && !joinId && !authError;
+  // /about shows the same landing page to signed-in users too (the header
+  // logo links there), with its buttons pointing back to their trips.
+  const onLandingPath = (location.pathname === "/" && !joinId && !authError) || aboutPage;
   if (onLandingPath && !authResolved) return null;
-  if (onLandingPath && !user) {
+  if (onLandingPath && (!user || aboutPage)) {
     return (
       <Suspense fallback={null}>
-        <Landing />
+        <Landing signedIn={Boolean(user)} />
       </Suspense>
     );
   }
@@ -470,10 +473,10 @@ export default function App() {
   return (
     <div className="page">
       <header className="top">
-        <span className="eyebrow">Trip Planner</span>
+        <Link to={user ? "/about" : "/"} className="eyebrow brand-link">Trip Planner</Link>
         <div className="top-row">
           <div>
-            <h1>여행 플래너</h1>
+            <h1><Link to={user ? "/about" : "/"} className="brand-link">여행 플래너</Link></h1>
             <div className="subline">여러 여행을 관리하고, 다녀온 여행엔 후기와 사진을 남겨보세요.</div>
           </div>
           <div className="btn-row" style={{ alignItems: "center", ...(!user && loginPage ? { alignSelf: "flex-end" } : null) }}>
