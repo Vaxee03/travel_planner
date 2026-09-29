@@ -273,8 +273,8 @@ body.lp-body{ padding:0; }
   .lp-nav{ gap:10px; }
   .lp-logo, .lp-nav-cta .btn{ white-space:nowrap; }
   .lp-nav-cta{ gap:6px; min-width:0; }
-  .lp{ --lp-gutter:16px; }
-  .lp-nav{ height:56px; padding:0 16px; }
+  .lp{ --lp-gutter:24px; }
+  .lp-nav{ height:56px; padding:0 24px; }
   .lp-logo{ font-size:18px; }
   .lp-nav .lp-logo svg{ width:26px; height:26px; }
   .lp-nav-cta .btn{ height:34px; padding:0 12px; font-size:13.5px; }
