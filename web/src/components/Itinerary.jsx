@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { fmtDate, mapUrl, routeStops, splitItems } from "../lib/utils";
+import { fmtDate, mapUrl, routeStops, splitItems, stableStringify } from "../lib/utils";
 import { mutateTrip } from "../lib/tripsApi";
 
 export default function Itinerary({ trip, dayIdx, setDayIdx, openModal, requestDelete, reorderDayItems, canEdit }) {
@@ -68,6 +68,7 @@ export default function Itinerary({ trip, dayIdx, setDayIdx, openModal, requestD
 function ItineraryMemo({ trip, canEdit }) {
   const [text, setText] = useState(trip.itineraryMemo || "");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
   const dirtyRef = useRef(false);
 
   useEffect(() => {
@@ -75,11 +76,16 @@ function ItineraryMemo({ trip, canEdit }) {
   }, [trip.itineraryMemo]);
 
   async function handleBlur() {
-    dirtyRef.current = false;
-    if (text === (trip.itineraryMemo || "")) return;
+    if (text === (trip.itineraryMemo || "")) { dirtyRef.current = false; return; }
     setSaving(true);
+    setSaveError(null);
     try {
       await mutateTrip(trip.id, (t) => { t.itineraryMemo = text; });
+      dirtyRef.current = false;
+    } catch {
+      // Keep the typed text (still marked dirty, so incoming updates don't
+      // overwrite it); leaving the box again retries.
+      setSaveError("메모를 저장하지 못했어요. 인터넷 연결을 확인한 뒤 메모 칸을 한 번 눌렀다가 빠져나오면 다시 저장해요.");
     } finally {
       setSaving(false);
     }
@@ -91,6 +97,7 @@ function ItineraryMemo({ trip, canEdit }) {
         <h2>📝 메모</h2>
         {saving && <span className="section-note">저장 중…</span>}
       </div>
+      {saveError && <div className="note" style={{ marginTop: 0, marginBottom: 10 }}><span className="dot" /><span>{saveError}</span></div>}
       <textarea
         className="itinerary-memo"
         rows={9}
@@ -142,15 +149,22 @@ function ItemBody({ trip, entry, dayIdx, openModal, requestDelete, canEdit }) {
  * Reordering is done with Pointer Events (not native HTML5 drag-and-drop,
  * which iOS/Android browsers don't support for touch) so it works on phones. */
 function ReorderableItemList({ trip, dayIdx, entries, openModal, requestDelete, onReorder, canEdit }) {
-  const [order, setOrder] = useState(entries.map((e) => e.idx));
   const [draggingIdx, setDraggingIdx] = useState(null);
   const rowRefs = useRef({});
   const dragRef = useRef(null);
   const byIdx = Object.fromEntries(entries.map((e) => [e.idx, e]));
 
-  useEffect(() => {
-    setOrder(entries.map((e) => e.idx));
-  }, [entries.map((e) => e.idx).join(",")]);
+  // The list is normally drawn straight from the data. A locally dragged
+  // order is shown only while it still applies to exactly the data it was
+  // made from (same items at the same positions): during the drag, and after
+  // the drop until the saved reorder comes back. Any change to the items —
+  // the saved reorder itself, or an add/delete/edit from anyone — drops it,
+  // so the screen can never show a stale order or point at a removed item.
+  const signature = entries.map((e) => `${e.idx}:${stableStringify(e.it)}`).join("|");
+  const [local, setLocal] = useState(null); // { order, signature }
+  const dataOrder = entries.map((e) => e.idx);
+  const order = local && local.signature === signature ? local.order : dataOrder;
+  const setOrder = (next) => setLocal({ order: next, signature });
 
   // Snapshot every other row's position once, at drag start, and compute the
   // target slot purely from the pointer's Y against that fixed snapshot —
@@ -198,7 +212,10 @@ function ReorderableItemList({ trip, dayIdx, entries, openModal, requestDelete, 
     if (!drag) return;
     dragRef.current = null;
     setDraggingIdx(null);
-    if (drag.active) onReorder(drag.lastOrder);
+    if (!drag.active) return;
+    // If the save is refused (someone changed this day meanwhile), go back to
+    // showing the data's order right away.
+    Promise.resolve(onReorder(drag.lastOrder)).then((ok) => { if (ok === false) setLocal(null); });
   }
 
   return (
@@ -236,7 +253,7 @@ function DayDetail({ trip, idx, setDayIdx, openModal, requestDelete, reorderDayI
     const slots = [...newOrder].sort((a, b) => a - b);
     const newItems = [...d.items];
     slots.forEach((slot, i) => { newItems[slot] = d.items[newOrder[i]]; });
-    reorderDayItems(idx, newItems);
+    return reorderDayItems(idx, newItems);
   }
 
   return (

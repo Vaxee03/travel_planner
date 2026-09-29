@@ -6,7 +6,7 @@ import { fetchNickname, setNickname } from "./lib/users";
 import { randomNickname } from "./lib/randomNickname";
 import {
   checklistItemId, copyChecklist, daysBetween, ensureChecklistIds, makeChecklistId, shiftDate,
-  locateDay, locateItem, stableStringify, StaleEditError,
+  locateDay, locateItem, stableStringify, StaleEditError, FormError, fmtDate, normalizeLink,
 } from "./lib/utils";
 import { computePerms, PERMISSION_CATEGORIES } from "./lib/permissions";
 import Home from "./components/Home";
@@ -181,14 +181,14 @@ export default function App() {
 
   function reorderDayItems(dayIdx, newItems) {
     const seen = trip.days[dayIdx];
-    runMutation(() => mutateTrip(tripId, (t) => {
+    return runMutation(() => mutateTrip(tripId, (t) => {
       const day = t.days[locateDay(t.days, seen.date)];
       // Only a pure reorder of the items the user was looking at — if someone
       // added/removed/edited one meanwhile, don't overwrite their change.
       const sortedKeys = (items) => (items || []).map(stableStringify).sort().join("|");
       if (sortedKeys(day.items) !== sortedKeys(seen.items)) throw new StaleEditError();
       day.items = newItems;
-    }));
+    })).catch(() => false);
   }
 
   // Runs a trip write; if the item the user acted on was already changed or
@@ -357,6 +357,9 @@ export default function App() {
     if (m.type === "add-day") {
       await mutateTrip(tripId, (t) => {
         t.days = t.days || [];
+        // Days are looked up by date everywhere, so two days with the same
+        // date would send edits on the second one to the first.
+        if (t.days.some((d) => d.date === values.date)) throw new FormError(`${fmtDate(values.date)}은(는) 이미 있는 날짜예요. 그 날짜에 항목을 추가해주세요.`);
         t.days.push({ date: values.date, status: values.status, summary: values.summary, items: [] });
         t.days.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
       });
@@ -367,6 +370,7 @@ export default function App() {
       const date = seenTrip.days[m.idx].date;
       await runMutation(() => mutateTrip(tripId, (t) => {
         const d = t.days[locateDay(t.days, date)];
+        if (values.date !== date && t.days.some((x) => x.date === values.date)) throw new FormError(`${fmtDate(values.date)}은(는) 이미 있는 날짜예요.`);
         d.date = values.date; d.status = values.status; d.summary = values.summary;
         t.days.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
       }));
@@ -434,9 +438,11 @@ export default function App() {
     }
     if (m.type === "add-booking" || m.type === "edit-booking") {
       const seen = m.type === "edit-booking" ? seenTrip.bookings[m.idx] : null;
+      const link = normalizeLink(values.link);
+      if (link === null) throw new FormError("링크는 인터넷 주소로 입력해주세요. (예: https://hotel.com 또는 www.hotel.com)");
       await runMutation(() => mutateTrip(tripId, (t) => {
         t.bookings = t.bookings || [];
-        const booking = { type: values.type, name: values.name, confirmNumber: values.confirmNumber, link: values.link, memo: values.memo };
+        const booking = { type: values.type, name: values.name, confirmNumber: values.confirmNumber, link, memo: values.memo };
         if (seen) t.bookings[locateItem(t.bookings, m.idx, seen)] = booking;
         else t.bookings.push(booking);
       }));

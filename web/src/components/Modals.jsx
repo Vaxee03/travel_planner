@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useJsApiLoader } from "@react-google-maps/api";
-import { fmtDate, itemKind } from "../lib/utils";
+import { fmtDate, itemKind, FormError } from "../lib/utils";
 import { MAPS_LOADER_OPTIONS } from "../lib/mapsLoader";
 import { fetchCitySuggestions, findPlaceLocation, INTERNATIONAL_REGION_CODES } from "../lib/placeSearch";
 import { EXTRA_INTERNATIONAL_DESTINATIONS } from "../lib/extraDestinations";
@@ -86,7 +86,7 @@ function SplitFields({ trip, item, uid }) {
  * other member. Checkbox names are perm_<uid>_<category>; App.jsx's
  * handleModalSubmit reconstructs the memberPermissions map from whichever
  * ones came back checked in the submitted FormData. */
-function PermissionsForm({ trip, onSubmit, onClose }) {
+function PermissionsForm({ trip, onSubmit, onClose, saveError }) {
   const memberIds = (trip?.memberIds || []).filter((uid) => uid !== trip?.ownerId);
   const nicknames = useNicknames(memberIds);
   const current = trip?.memberPermissions || {};
@@ -119,6 +119,7 @@ function PermissionsForm({ trip, onSubmit, onClose }) {
           })}
         </div>
       )}
+      <FormNote message={saveError} />
       <Actions submitLabel="저장" onClose={onClose} />
     </form>
   );
@@ -128,7 +129,7 @@ function PermissionsForm({ trip, onSubmit, onClose }) {
  * drops to a regular member (no permission category is auto-granted to
  * them), so they keep only the baseline actions until the new 방장 grants
  * more via 권한 관리. */
-function TransferOwnershipForm({ trip, onSubmit, onClose }) {
+function TransferOwnershipForm({ trip, onSubmit, onClose, saveError }) {
   const memberIds = (trip?.memberIds || []).filter((uid) => uid !== trip?.ownerId);
   const nicknames = useNicknames(memberIds);
 
@@ -150,6 +151,7 @@ function TransferOwnershipForm({ trip, onSubmit, onClose }) {
           </select>
         </div>
       )}
+      <FormNote message={saveError} />
       <Actions submitLabel="위임" onClose={onClose} />
     </form>
   );
@@ -307,11 +309,45 @@ function FormNote({ message }) {
 
 /** Renders the overlay + the right form for `modal.type`. Submits call
  * onSubmit(modal.type, values) so App.jsx can own all the write logic. */
-export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit }) {
+export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit: save }) {
   const [formError, setFormError] = useState(null);
-  useEffect(() => { setFormError(null); }, [modal]);
+  const [busy, setBusy] = useState(false);
+  // A ref, not just state: two clicks in the same frame both see busy=false.
+  const busyRef = useRef(false);
+  useEffect(() => { setFormError(null); setBusy(false); busyRef.current = false; }, [modal]);
 
   if (!modal) return null;
+
+  // Every save from this dialog goes through here: ignores repeat clicks
+  // while one is in flight (a double-tap used to save twice), and if the
+  // save fails keeps the dialog — and what was typed — open with a reason.
+  async function onSubmit(m, values) {
+    if (busyRef.current) return;
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      setFormError("인터넷에 연결되어 있지 않아 저장하지 못했어요. 연결을 확인한 뒤 다시 시도해주세요.");
+      return;
+    }
+    busyRef.current = true;
+    setBusy(true);
+    setFormError(null);
+    try {
+      await save(m, values);
+    } catch (err) {
+      if (err instanceof FormError) {
+        setFormError(err.message);
+      } else {
+        reportError(err, `modal-${m.type}`);
+        setFormError(
+          err?.code === "unavailable" || navigator.onLine === false
+            ? "서버에 연결하지 못해 저장하지 못했어요. 인터넷 연결을 확인한 뒤 다시 시도해주세요. 입력한 내용은 그대로 있어요."
+            : "저장하지 못했어요. 잠시 후 다시 시도해주세요. 입력한 내용은 그대로 있어요."
+        );
+      }
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  }
 
   function handleSubmit(e) {
     e.preventDefault();
@@ -333,6 +369,7 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit }
       <>
         <h3>확인</h3>
         <p style={{ margin: "0 0 4px" }}>{modal.message}</p>
+        {formError && <div style={{ marginTop: 14 }}><FormNote message={formError} /></div>}
         <div className="modal-actions">
           <button type="button" className="btn" onClick={onClose}>취소</button>
           <button
@@ -349,7 +386,7 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit }
   } else if (modal.type === "add-trip" || modal.type === "edit-trip") {
     const isEdit = modal.type === "edit-trip";
     const t = isEdit ? trip : {};
-    content = <TripForm isEdit={isEdit} t={t} trips={trips} onSubmit={handleSubmit} onClose={onClose} />;
+    content = <TripForm isEdit={isEdit} t={t} trips={trips} onSubmit={handleSubmit} onClose={onClose} saveError={formError} />;
   } else if (modal.type === "duplicate-trip") {
     content = (
       <form onSubmit={handleSubmit} noValidate>
@@ -385,7 +422,7 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit }
   } else if (modal.type === "add-item" || modal.type === "edit-item") {
     const isEdit = modal.type === "edit-item";
     const it = isEdit ? seenTrip.days[modal.dayIdx].items[modal.idx] : { time: "", text: "" };
-    content = <ItemForm isEdit={isEdit} it={it} destination={trip.destination} onSubmit={handleSubmit} onClose={onClose} />;
+    content = <ItemForm isEdit={isEdit} it={it} destination={trip.destination} onSubmit={handleSubmit} onClose={onClose} saveError={formError} />;
   } else if (modal.type === "add-budget" || modal.type === "edit-budget") {
     const isEdit = modal.type === "edit-budget";
     const b = isEdit ? seenTrip.budgetItems[modal.idx] : { category: "", amount: "", memo: "" };
@@ -436,15 +473,15 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit }
   } else if (modal.type === "invite") {
     content = <InviteCard trip={trip} onClose={onClose} />;
   } else if (modal.type === "manage-permissions") {
-    content = <PermissionsForm trip={trip} onSubmit={handleSubmit} onClose={onClose} />;
+    content = <PermissionsForm trip={trip} onSubmit={handleSubmit} onClose={onClose} saveError={formError} />;
   } else if (modal.type === "transfer-ownership") {
-    content = <TransferOwnershipForm trip={trip} onSubmit={handleSubmit} onClose={onClose} />;
+    content = <TransferOwnershipForm trip={trip} onSubmit={handleSubmit} onClose={onClose} saveError={formError} />;
   } else if (modal.type === "view-location") {
     content = <LocationViewer location={modal.location} label={modal.label} onClose={onClose} />;
   } else if (modal.type === "delete-account") {
     content = <DeleteAccountForm modal={modal} onSubmit={onSubmit} onClose={onClose} />;
   } else if (modal.type === "add-restaurant") {
-    content = <RestaurantItemForm trip={seenTrip} restaurant={modal.restaurant} onSubmit={handleSubmit} onClose={onClose} />;
+    content = <RestaurantItemForm trip={seenTrip} restaurant={modal.restaurant} onSubmit={handleSubmit} onClose={onClose} saveError={formError} />;
   } else if (modal.type === "share-link") {
     content = <ShareLinkForm trip={trip} onSubmit={onSubmit} onClose={onClose} />;
   } else if (modal.type === "view-route") {
@@ -476,6 +513,7 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit }
           <label>후기</label>
           <textarea name="text" rows={7} placeholder="여행은 어땠나요?" defaultValue={myPost?.text || ""} />
         </div>
+        <FormNote message={formError} />
         <Actions submitLabel="저장" onClose={onClose} />
       </form>
     );
@@ -485,13 +523,16 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit }
   return (
     <div className="modal-overlay">
       <div className={"modal" + (isWide ? " modal-wide" : "")} onClick={(e) => e.stopPropagation()}>
-        {content}
+        {/* Locks every field and button while a save is in flight. */}
+        <fieldset className="modal-fieldset" disabled={busy} aria-busy={busy}>
+          {content}
+        </fieldset>
       </div>
     </div>
   );
 }
 
-function TripForm({ isEdit, t, trips, onSubmit, onClose }) {
+function TripForm({ isEdit, t, trips, onSubmit, onClose, saveError }) {
   const checklistSources = (trips || []).filter((tr) => (tr.checklist || []).length > 0);
   const [startDate, setStartDate] = useState(t.startDate || "");
   const [endDate, setEndDate] = useState(t.endDate || "");
@@ -566,7 +607,7 @@ function TripForm({ isEdit, t, trips, onSubmit, onClose }) {
           </select>
         </div>
       )}
-      <FormNote message={error} />
+      <FormNote message={error || saveError} />
       <Actions submitLabel={isEdit ? "저장" : "여행 만들기"} onClose={onClose} />
     </form>
   );
@@ -812,7 +853,7 @@ function DestinationField({ tripType, defaultValue }) {
  * Places call, only because the user asked to add it), then opens the
  * regular item form pre-filled with a day picker, "식사" label, the name
  * and that pin — any of which the user can still change. */
-function RestaurantItemForm({ trip, restaurant, onSubmit, onClose }) {
+function RestaurantItemForm({ trip, restaurant, onSubmit, onClose, saveError }) {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
   const { isLoaded, loadError } = useJsApiLoader({ googleMapsApiKey: apiKey || "", ...MAPS_LOADER_OPTIONS });
   const [location, setLocation] = useState(undefined); // undefined = still looking
@@ -864,11 +905,12 @@ function RestaurantItemForm({ trip, restaurant, onSubmit, onClose }) {
       destination={trip.destination}
       onSubmit={onSubmit}
       onClose={onClose}
+      saveError={saveError}
     />
   );
 }
 
-function ItemForm({ isEdit, it, prefilled, title, notice, dayOptions, destination, onSubmit, onClose }) {
+function ItemForm({ isEdit, it, prefilled, title, notice, dayOptions, destination, onSubmit, onClose, saveError }) {
   const initialKind = isEdit || prefilled ? itemKind(it) : "time";
   const [kind, setKind] = useState(initialKind);
   const [error, setError] = useState(null);
@@ -915,7 +957,7 @@ function ItemForm({ isEdit, it, prefilled, title, notice, dayOptions, destinatio
       )}
       <Field name="text" label="내용" placeholder="예: 오와쿠다니 로프웨이" required defaultValue={it.text} />
       <ItemLocationField initial={it.location} destination={destination} />
-      <FormNote message={error} />
+      <FormNote message={error || saveError} />
       <Actions submitLabel={isEdit ? "저장" : "추가"} onClose={onClose} />
     </form>
   );

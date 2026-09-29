@@ -257,6 +257,10 @@ section{ margin-bottom:44px; }
 /* ---- Modal ---- */
 .modal-overlay{ position:fixed; inset:0; background:rgba(20,16,12,.45); display:flex; align-items:center; justify-content:center; padding:24px; z-index:50; }
 .modal{ background:var(--surface); border-radius:16px; border:1px solid var(--line); padding:26px 26px 22px; width:100%; max-width:440px; max-height:88vh; overflow-y:auto; }
+/* Wraps every dialog's content; disabled while a save is in flight. */
+.modal-fieldset{ border:0; padding:0; margin:0; min-width:0; }
+.modal-fieldset:disabled .btn{ cursor:progress; }
+.modal-fieldset:disabled .btn-primary{ opacity:.6; }
 .modal.modal-wide{ max-width:640px; }
 .modal h3{ font-family:"Noto Serif KR",serif; font-size:19px; margin:0 0 18px; }
 .field{ margin-bottom:14px; }

@@ -395,6 +395,14 @@ await tc("B-03", A4, "예약 링크에 'javascript:' 입력 (보안)",
   "스크립트가 실행되지 않음",
   async () => {
     await addBooking({ type: "기타", name: "스크립트테스트", link: "javascript:alert(1)" });
+    if (await modalOpen(po)) {
+      // Rejected at input time — save it without the link so later steps have the card.
+      const note = await po.evaluate(() => [...document.querySelectorAll(".modal .note")].map((n) => n.innerText).join(" "));
+      await fill(po, { link: "" });
+      await submitModal(po);
+      await wait(700);
+      return `입력 단계에서 거절: "${note}"`;
+    }
     po.__lastDialog = null;
     const href = await po.evaluate(() => [...document.querySelectorAll(".food-card")].find((c) => c.innerText.includes("스크립트테스트"))?.querySelector("a")?.getAttribute("href"));
     await po.evaluate(() => [...document.querySelectorAll(".food-card")].find((c) => c.innerText.includes("스크립트테스트"))?.querySelector("a")?.removeAttribute("target"));

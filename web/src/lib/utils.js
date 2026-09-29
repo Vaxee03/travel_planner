@@ -48,6 +48,12 @@ export function stableStringify(v) {
 
 /** Thrown when the item a user acted on no longer exists in the latest data
  * (another member deleted or changed it first). */
+/** A problem with what the user entered, found while saving — its message is
+ * shown as-is in the open form (e.g. "이미 있는 날짜예요"). */
+export class FormError extends Error {
+  constructor(message) { super(message); this.name = "FormError"; }
+}
+
 export class StaleEditError extends Error {
   constructor() { super("stale-edit"); this.name = "StaleEditError"; }
 }
@@ -113,6 +119,19 @@ export function tripStatus(t) {
 
 export function statusLabel(s) {
   return { upcoming: "예정", ongoing: "여행중", completed: "완료" }[s] || s;
+}
+
+/** A booking link as people type it ("www.hotel.com/…", "hotel.com") turned
+ * into a full https URL, so it opens the site instead of a path inside this
+ * app. Only http(s) links are allowed. "" for empty, null if it isn't a web
+ * address at all (or uses another scheme like javascript:). */
+export function normalizeLink(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return "";
+  if (/^https?:\/\/\S+$/i.test(s)) return s;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(s)) return null;
+  if (/^[^\s/]+\.[a-z]{2,}(?:[/?#]\S*)?$/i.test(s)) return "https://" + s;
+  return null;
 }
 
 export function mapUrl(q) {
