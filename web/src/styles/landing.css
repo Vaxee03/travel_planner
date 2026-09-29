@@ -35,11 +35,15 @@ body.lp-body{ padding:0; }
 }
 .lp-logo{ display:inline-flex; align-items:center; gap:12px; text-decoration:none; color:var(--ink); font-weight:800; font-size:28px; letter-spacing:.01em; }
 .lp-logo.small{ font-size:15px; }
-/* centered on the page, over the middle of the content column */
-.lp-nav-links{ position:absolute; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:40px; }
+/* Starts on the content column's left edge; on screens too narrow for that
+ * to clear the logo, it sits just right of the logo instead. */
+.lp-nav-links{
+  position:absolute; left:max(calc((100% - var(--lp-max)) / 2 + var(--lp-gutter)), 330px);
+  display:flex; align-items:center; gap:40px;
+}
 .lp-nav-links a{ color:var(--ink-soft); text-decoration:none; font-size:20px; font-weight:600; }
 .lp-nav-links a:hover{ color:var(--ink); }
-.lp-nav-cta{ margin-left:auto; display:flex; align-items:center; gap:12px; }
+.lp-nav-cta{ margin-left:auto; display:flex; align-items:center; gap:12px; }
 .lp-nav-cta .btn{ height:50px; padding:0 24px; font-size:17px; font-weight:700; border-radius:12px; }
 
 /* hero */
