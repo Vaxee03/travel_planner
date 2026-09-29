@@ -273,9 +273,9 @@ await tc("F-07", A2, "예산 초과 표시",
   "위 금액으로 지출이 총 예산(900,000원)을 크게 넘은 상태 확인",
   "초과 사실을 알 수 있는 표시가 있어야 함",
   async () => {
-    const r = await po.evaluate(() => ({ bar: document.querySelector(".budget-bar-fill")?.style.width, txt: document.querySelector(".budget-hero")?.innerText.replace(/\n/g, " ") }));
-    const warn = /초과|넘/.test(r.txt);
-    return { actual: `진행 바 ${r.bar}, 상단: ${r.txt}`, status: warn ? "PASS" : "WARN", note: warn ? "" : "예산을 넘겨도 진행 바가 100%에서 멈출 뿐 '초과' 안내가 없음" };
+    const r = await po.evaluate(() => ({ bar: document.querySelector(".budget-bar-fill")?.style.width, over: document.querySelector(".budget-bar-fill")?.classList.contains("over"), txt: document.querySelector(".budget-status")?.innerText || "" }));
+    const warn = /초과|더 썼/.test(r.txt) && r.over;
+    return { actual: `진행 바 ${r.bar}${r.over ? "(빨간색)" : ""}, 안내: "${r.txt}"`, status: warn ? "PASS" : "WARN", note: warn ? "" : "예산을 넘겨도 진행 바가 100%에서 멈출 뿐 '초과' 안내가 없음" };
   });
 
 await tc("F-08", A2, "지출 수정 후 정산 갱신",

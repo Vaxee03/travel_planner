@@ -35,7 +35,14 @@ export default function Budget({ trip, openModal, requestDelete, canEdit }) {
           </div>
           <div className="budget-per">총 예산<b className="nums">{fmtMoney(total)}원</b></div>
         </div>
-        <div className="budget-bar"><div className="budget-bar-fill" style={{ width: pct + "%" }} /></div>
+        <div className="budget-bar"><div className={"budget-bar-fill" + (total > 0 && spent > total ? " over" : "")} style={{ width: pct + "%" }} /></div>
+        {total > 0 && (
+          <div className={"budget-status" + (spent > total ? " over" : "")}>
+            {spent > total
+              ? `예산보다 ${fmtMoney(spent - total)}원 더 썼어요`
+              : `남은 예산 ${fmtMoney(total - spent)}원 · ${Math.round((spent / total) * 100)}% 사용`}
+          </div>
+        )}
         {travelers > 1 && (
           <div className="card" style={{ marginTop: 16 }}>
             <div className="cat-row" style={{ borderBottom: "none" }}>

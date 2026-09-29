@@ -437,7 +437,7 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit: 
       <form onSubmit={handleSubmit} noValidate>
         <h3>{isEdit ? "지출 항목 수정" : "지출 항목 추가"}</h3>
         <Field name="category" label="카테고리" placeholder="예: 숙박 / 교통 / 식비 / 쇼핑" required defaultValue={b.category} />
-        <Field name="amount" label="금액 (원)" type="number" placeholder="예: 150000" required defaultValue={b.amount} />
+        <Field name="amount" label="금액 (원)" type="number" placeholder="예: 150000" required min={0} defaultValue={b.amount} />
         <Field name="memo" label="메모" placeholder="선택" defaultValue={b.memo} />
         <SplitFields trip={trip} item={isEdit ? b : null} uid={uid} />
         <FormNote message={formError} />
@@ -603,7 +603,7 @@ function TripForm({ isEdit, t, trips, onSubmit, onClose, saveError }) {
       </div>
       <div className="field-row">
         <Field name="travelers" label="인원 수" type="number" placeholder="예: 2" min={1} required defaultValue={t.travelers || 1} />
-        <Field name="budgetTotal" label="총 예산 (원)" type="number" placeholder="예: 1000000" defaultValue={t.budgetTotal} />
+        <Field name="budgetTotal" label="총 예산 (원)" type="number" placeholder="예: 1000000" min={0} defaultValue={t.budgetTotal} />
       </div>
       {isEdit && (t.days || []).length > 0 && (startDate !== t.startDate || endDate !== t.endDate) && (
         <label className="field" style={{ display: "flex", alignItems: "flex-start", gap: 8, fontWeight: 400, color: "var(--ink)" }}>
