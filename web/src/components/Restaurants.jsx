@@ -4,6 +4,19 @@ import { fmtDate } from "../lib/utils";
 import InfoTooltip from "./InfoTooltip";
 import { reportError } from "../lib/errorReporting";
 
+/** A failed recommendation call in plain words. The callable error message
+ * carries the server's Korean text but the SDK tacks a status code on the end
+ * ("… [500]"), which users shouldn't see. */
+function recErrorMessage(err) {
+  const code = String(err?.code || "").replace(/^functions\//, "");
+  const serverText = String(err?.message || "").replace(/\s*\[\d+\]\s*$/, "").trim();
+  if (code === "resource-exhausted") return serverText || "오늘 맛집 추천 횟수를 모두 썼어요. 내일 다시 시도해주세요.";
+  if (!navigator.onLine || code === "unavailable") return "인터넷 연결을 확인한 뒤 다시 시도해주세요.";
+  if (code === "deadline-exceeded") return "추천을 찾는 데 너무 오래 걸렸어요. 다시 시도해주세요.";
+  if (code === "unauthenticated") return "로그인이 풀렸어요. 새로고침 후 다시 시도해주세요.";
+  return "지금은 맛집 추천을 받을 수 없어요. 잠시 후 다시 시도해주세요.";
+}
+
 /** Dates of the days that already hold an item added from this
  * recommendation (tagged with `restaurant` when it was added). */
 function addedDates(trip, name) {
@@ -28,7 +41,7 @@ export default function Restaurants({ trip, openModal, canAddToItinerary }) {
     } catch (err) {
       // Hitting the daily limit is expected, not a bug worth reporting.
       if (err?.code !== "functions/resource-exhausted") reportError(err, "restaurant-recs");
-      setError(err?.message || "맛집 추천을 가져오지 못했어요.");
+      setError(recErrorMessage(err));
     } finally {
       setLoading(false);
     }
