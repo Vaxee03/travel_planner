@@ -465,7 +465,7 @@ export default function App() {
   if (onLandingPath && (!user || aboutPage)) {
     return (
       <Suspense fallback={null}>
-        <Landing signedIn={Boolean(user)} />
+        <Landing signedIn={Boolean(user)} nickname={nickname} />
       </Suspense>
     );
   }

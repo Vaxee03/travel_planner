@@ -536,11 +536,11 @@ const STEPS = [
 function useSmoothJump(reduce) {
   return useCallback((e) => {
     const id = e.currentTarget.getAttribute("href")?.slice(1);
-    const target = id && document.getElementById(id);
-    if (!target) return;
+    const target = id && id !== "top" && document.getElementById(id);
+    if (id !== "top" && !target) return;
     e.preventDefault();
     const navH = document.querySelector(".lp-nav")?.offsetHeight || 0;
-    const to = Math.max(0, target.getBoundingClientRect().top + window.scrollY - navH);
+    const to = target ? Math.max(0, target.getBoundingClientRect().top + window.scrollY - navH) : 0;
     if (reduce) { window.scrollTo(0, to); return; }
     const distance = Math.abs(to - window.scrollY);
     const controls = animate(window.scrollY, to, {
@@ -562,7 +562,7 @@ function useSmoothJump(reduce) {
 const HERO_PATH = "M-60 330 C 160 380, 300 140, 500 190 S 780 360, 1060 40";
 const JOURNEY_PATH = "M88 0 C 88 70, 6 80, 6 190 S 94 330, 94 440 S 6 600, 6 700 S 90 830, 90 900 S 50 960, 50 1000";
 
-export default function Landing({ signedIn = false }) {
+export default function Landing({ signedIn = false, nickname = "" }) {
   // Signed-in visitors (via the app's header logo → /about) get buttons back
   // to their trips instead of the sign-up prompts.
   const startTo = signedIn ? "/" : "/login";
@@ -593,16 +593,19 @@ export default function Landing({ signedIn = false }) {
       <MotionConfig reducedMotion="user">
       <div className="lp">
         <nav className="lp-nav">
-          <Link to="/" className="lp-logo">
+          {/* Already on the landing page — the logo just glides back to the top
+              (and never drops a signed-in visitor into their trip list). */}
+          <a href="#top" className="lp-logo" onClick={jump}>
             <PaperPlane size={40} />
             <span>Trip Planner</span>
-          </Link>
+          </a>
           <div className="lp-nav-links">
             <a href="#features" onClick={jump}>기능</a>
             <a href="#together" onClick={jump}>함께 쓰기</a>
             <a href="#steps" onClick={jump}>시작 방법</a>
           </div>
           <div className="lp-nav-cta">
+            {signedIn && nickname && <span className="lp-nav-user"><b>{nickname}</b>님</span>}
             {!signedIn && <Link to="/login" className="btn btn-ghost">로그인</Link>}
             <Link to={startTo} className="btn btn-primary btn-sm">{signedIn ? "내 여행으로" : "무료로 시작하기"}</Link>
           </div>

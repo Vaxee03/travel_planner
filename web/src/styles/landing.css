@@ -44,6 +44,8 @@ body.lp-body{ padding:0; }
 .lp-nav-links a{ color:var(--ink-soft); text-decoration:none; font-size:20px; font-weight:600; }
 .lp-nav-links a:hover{ color:var(--ink); }
 .lp-nav-cta{ margin-left:auto; display:flex; align-items:center; gap:12px; }
+.lp-nav-user{ font-size:17px; color:var(--ink-soft); margin-right:6px; white-space:nowrap; max-width:220px; overflow:hidden; text-overflow:ellipsis; }
+.lp-nav-user b{ color:var(--nickname); font-weight:700; }
 .lp-nav-cta .btn{ height:50px; padding:0 24px; font-size:17px; font-weight:700; border-radius:12px; }
 
 /* hero */
@@ -267,6 +269,10 @@ body.lp-body{ padding:0; }
 
 /* phone */
 @media (max-width:600px){
+  .lp-nav-user{ font-size:13.5px; max-width:88px; margin-right:0; }
+  .lp-nav{ gap:10px; }
+  .lp-logo, .lp-nav-cta .btn{ white-space:nowrap; }
+  .lp-nav-cta{ gap:6px; min-width:0; }
   .lp{ --lp-gutter:16px; }
   .lp-nav{ height:56px; padding:0 16px; }
   .lp-logo{ font-size:18px; }
