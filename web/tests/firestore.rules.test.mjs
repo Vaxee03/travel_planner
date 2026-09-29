@@ -6,7 +6,7 @@ import {
   initializeTestEnvironment, assertSucceeds, assertFails,
 } from "@firebase/rules-unit-testing";
 import {
-  doc, getDoc, setDoc, updateDoc, arrayRemove, deleteField,
+  doc, getDoc, setDoc, updateDoc, arrayRemove, arrayUnion, deleteField,
 } from "firebase/firestore";
 
 const env = await initializeTestEnvironment({
@@ -88,4 +88,12 @@ test("nicknames: only your own, 1–20 characters", async () => {
   await assertSucceeds(setDoc(doc(db("alice"), "users/alice"), { nickname: "여행러버", updatedAt: 1 }));
   await assertFails(setDoc(doc(db("alice"), "users/alice"), { nickname: "가".repeat(21), updatedAt: 1 }));
   await assertFails(setDoc(doc(db("alice"), "users/bob"), { nickname: "남의 닉네임", updatedAt: 1 }));
+});
+
+test("a member the 방장 removed can't rejoin until allowed again", async () => {
+  await assertSucceeds(updateDoc(doc(db("owner"), "trips/t1"), { memberIds: arrayRemove("alice"), blockedIds: ["alice"] }));
+  await assertFails(updateDoc(doc(db("alice"), "trips/t1"), { memberIds: arrayUnion("alice") }));
+  await assertFails(updateDoc(doc(db("bob"), "trips/t1"), { blockedIds: [] }));
+  await assertSucceeds(updateDoc(doc(db("owner"), "trips/t1"), { blockedIds: [] }));
+  await assertSucceeds(updateDoc(doc(db("alice"), "trips/t1"), { memberIds: arrayUnion("alice") }));
 });

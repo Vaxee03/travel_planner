@@ -2,6 +2,8 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Link, matchPath, useLocation, useNavigate } from "react-router-dom";
 import { firebaseReady, watchAuth, signOutUser, deleteMyAccount } from "./lib/firebase";
 import { subscribeTrips, createTrip, mutateTrip, deleteTrip, joinTrip, removeMember, setChecklistDone, setPublicShareId } from "./lib/tripsApi";
+
+const JOIN_FAILED = "여행에 참여하지 못했어요. 코드가 맞는지, 방장이 참여를 막지 않았는지 확인해주세요.";
 import { fetchNickname, setNickname, NICKNAME_MAX } from "./lib/users";
 import { randomNickname } from "./lib/randomNickname";
 import {
@@ -51,6 +53,8 @@ export default function App() {
   const tab = TAB_KEYS.includes(tripMatch?.params.tab) ? tripMatch.params.tab : "itinerary";
   const [dayIdx, setDayIdx] = useState(null);
   const [modal, setModal] = useState(null);
+  // A one-off notice shown above the page (e.g. an invite link that failed).
+  const [flash, setFlash] = useState(null);
   const [nickname, setNicknameState] = useState("");
   const nicknamePromptedRef = useRef(null);
 
@@ -114,7 +118,7 @@ export default function App() {
     if (!user || !joinId) return;
     joinTrip(joinId, user.uid)
       .then(() => navigate(`/trip/${joinId}/itinerary`, { replace: true }))
-      .catch(() => navigate("/", { replace: true }));
+      .catch(() => { setFlash(JOIN_FAILED); navigate("/", { replace: true }); });
   }, [user, joinId, navigate]);
 
   // If a nickname hasn't been set yet (brand-new signup or a pre-existing
@@ -219,7 +223,7 @@ export default function App() {
         await deleteTrip(tripId);
         navigate("/", { replace: true });
       } else if (m.onYes === "remove-member") {
-        await removeMember(tripId, m.uid);
+        await removeMember(tripId, m.uid, { block: true });
       } else if (m.onYes === "leave-trip") {
         await removeMember(tripId, user.uid);
         navigate("/", { replace: true });
@@ -525,6 +529,12 @@ export default function App() {
         </div>
       </header>
 
+      {flash && (
+        <div className="note flash" role="status">
+          <span className="dot" /><span style={{ flex: 1 }}>{flash}</span>
+          <button type="button" className="btn-ghost" aria-label="닫기" onClick={() => setFlash(null)}>✕</button>
+        </div>
+      )}
       <Suspense fallback={<div className="empty">불러오는 중이에요…</div>}>
       {legalPage === "terms" ? (
         <TermsPage />

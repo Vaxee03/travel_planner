@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useJsApiLoader } from "@react-google-maps/api";
 import { reportFormProblem } from "../lib/formProblem";
+import { unblockMember } from "../lib/tripsApi";
 import { fmtDate, itemKind, FormError, datesInRange } from "../lib/utils";
 import { MAPS_LOADER_OPTIONS } from "../lib/mapsLoader";
 import { fetchCitySuggestions, findPlaceLocation, INTERNATIONAL_REGION_CODES } from "../lib/placeSearch";
@@ -89,7 +90,9 @@ function SplitFields({ trip, item, uid }) {
  * ones came back checked in the submitted FormData. */
 function PermissionsForm({ trip, onSubmit, onClose, saveError }) {
   const memberIds = (trip?.memberIds || []).filter((uid) => uid !== trip?.ownerId);
-  const nicknames = useNicknames(memberIds);
+  const blockedIds = trip?.blockedIds || [];
+  const nicknames = useNicknames([...memberIds, ...blockedIds]);
+  const [unblocking, setUnblocking] = useState(null);
   const current = trip?.memberPermissions || {};
 
   return (
@@ -118,6 +121,25 @@ function PermissionsForm({ trip, onSubmit, onClose, saveError }) {
               </div>
             );
           })}
+        </div>
+      )}
+      {blockedIds.length > 0 && (
+        <div style={{ marginTop: 18 }}>
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>내보낸 동행자</div>
+          <p style={{ margin: "0 0 8px", color: "var(--ink-soft)", fontSize: 13 }}>내보낸 사람은 같은 참여 코드·초대 링크로 다시 들어올 수 없어요.</p>
+          {blockedIds.map((uid) => (
+            <div key={uid} className="btn-row" style={{ justifyContent: "space-between", padding: "4px 0" }}>
+              <span>{nicknames[uid] || DEFAULT_NICKNAME}</span>
+              <button
+                type="button"
+                className="btn btn-sm"
+                disabled={unblocking === uid}
+                onClick={async () => { setUnblocking(uid); try { await unblockMember(trip.id, uid); } finally { setUnblocking(null); } }}
+              >
+                다시 참여 허용
+              </button>
+            </div>
+          ))}
         </div>
       )}
       <FormNote message={saveError} />

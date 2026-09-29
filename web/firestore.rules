@@ -18,7 +18,9 @@ service cloud.firestore {
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds']) &&
           request.resource.data.memberIds.hasAll(resource.data.memberIds) &&
           request.auth.uid in request.resource.data.memberIds &&
-          request.resource.data.memberIds.size() == resource.data.memberIds.size() + 1
+          request.resource.data.memberIds.size() == resource.data.memberIds.size() + 1 &&
+          // someone the 방장 removed can't let themselves back in
+          !(request.auth.uid in resource.data.get('blockedIds', []))
         ) ||
         isLeavingSelf() ||
         (request.auth.uid in resource.data.memberIds && isAllowedTripUpdate())
@@ -65,7 +67,7 @@ service cloud.firestore {
       function isAllowedTripUpdate() {
         let changed = request.resource.data.diff(resource.data).affectedKeys();
         return
-          (!changed.hasAny(['title', 'destination', 'startDate', 'endDate', 'travelers', 'budgetTotal', 'tripType', 'ownerId', 'memberPermissions', 'memberIds', 'publicShareId']) || isOwner()) &&
+          (!changed.hasAny(['title', 'destination', 'startDate', 'endDate', 'travelers', 'budgetTotal', 'tripType', 'ownerId', 'memberPermissions', 'memberIds', 'publicShareId', 'blockedIds']) || isOwner()) &&
           // The 방장 always stays a member — they can't drop themselves from
           // memberIds (orphaning the trip) or hand ownerId to a non-member.
           (!changed.hasAny(['memberIds', 'ownerId']) || request.resource.data.ownerId in request.resource.data.memberIds) &&

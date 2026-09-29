@@ -89,7 +89,7 @@ export default function TripDetail({ trip, uid, perms, tab, setTab, dayIdx, setD
                     className="btn-ghost"
                     title="내보내기"
                     style={{ padding: "0 4px", fontSize: 12, color: "var(--danger)" }}
-                    onClick={() => requestDelete("remove-member", `${nicknames[memberId] || DEFAULT_NICKNAME}님을 이 여행에서 내보낼까요?`, { uid: memberId, confirmLabel: "내보내기" })}
+                    onClick={() => requestDelete("remove-member", `${nicknames[memberId] || DEFAULT_NICKNAME}님을 이 여행에서 내보낼까요? 내보낸 사람은 같은 초대 코드로 다시 들어올 수 없어요(권한 관리에서 다시 허용 가능).`, { uid: memberId, confirmLabel: "내보내기" })}
                   >
                     ✕
                   </button>

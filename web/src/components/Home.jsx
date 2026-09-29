@@ -17,7 +17,7 @@ export default function Home({ trips, onOpenTrip, onAddTrip, onJoinByCode }) {
       await onJoinByCode(trimmed);
       setCode("");
     } catch {
-      setError("코드를 찾을 수 없어요. 다시 확인해주세요.");
+      setError("코드를 찾을 수 없거나 참여할 수 없는 여행이에요. 코드를 확인하거나 방장에게 문의해주세요.");
     } finally {
       setJoining(false);
     }

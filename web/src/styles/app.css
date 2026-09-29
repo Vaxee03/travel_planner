@@ -272,6 +272,8 @@ section{ margin-bottom:44px; }
 
 .note{ display:flex; gap:10px; align-items:flex-start; font-size:14.5px; color:var(--ink-soft); background:var(--surface-2); border-radius:10px; padding:11px 14px; margin-top:14px; }
 .note .dot{ flex:0 0 auto; width:6px; height:6px; margin-top:7px; border-radius:50%; background:var(--gold); }
+.note.flash{ margin:0 0 20px; align-items:center; }
+.note.flash .btn-ghost{ padding:0 4px; }
 
 footer.app-footer{ text-align:center; color:var(--ink-soft); font-size:14px; padding-top:12px; border-top:1px solid var(--line); margin-top:20px; }
 footer.app-footer .footer-links{ display:inline-flex; gap:14px; margin-top:6px; font-size:13px; }

@@ -82,11 +82,20 @@ export function joinTrip(tripId, uid) {
 /** Drops a member from a trip along with any permissions they'd been
  * granted. Used both for leaving on your own (non-방장 only, see the
  * isLeavingSelf rule) and for the 방장 removing someone else. */
-export function removeMember(tripId, uid) {
+/** Takes `uid` out of the trip. With `block` (방장 removing someone) they're
+ * also put on blockedIds, which the security rules check so the same invite
+ * code/link can't bring them straight back; leaving on your own doesn't. */
+export function removeMember(tripId, uid, { block = false } = {}) {
   return updateDoc(doc(db, "trips", tripId), {
     memberIds: arrayRemove(uid),
     [`memberPermissions.${uid}`]: deleteField(),
+    ...(block ? { blockedIds: arrayUnion(uid) } : {}),
   });
+}
+
+/** 방장 only — lets a removed member join again with the invite code. */
+export function unblockMember(tripId, uid) {
+  return updateDoc(doc(db, "trips", tripId), { blockedIds: arrayRemove(uid) });
 }
 
 /** A single-field update (not a mutateTrip transaction) so toggling a
