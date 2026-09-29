@@ -337,7 +337,29 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit: 
   const [busy, setBusy] = useState(false);
   // A ref, not just state: two clicks in the same frame both see busy=false.
   const busyRef = useRef(false);
-  useEffect(() => { setFormError(null); setBusy(false); busyRef.current = false; }, [modal]);
+  // Set once anything is typed/changed in the dialog, so closing it with Esc
+  // or a click outside asks before throwing that away.
+  const dirtyRef = useRef(false);
+  const pressedOverlayRef = useRef(false);
+  useEffect(() => { setFormError(null); setBusy(false); busyRef.current = false; dirtyRef.current = false; }, [modal]);
+
+  function requestClose() {
+    if (busyRef.current) return;
+    if (dirtyRef.current && !window.confirm("작성 중인 내용이 사라져요. 닫을까요?")) return;
+    onClose();
+  }
+
+  useEffect(() => {
+    if (!modal) return undefined;
+    function onKey(e) {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      // A second dialog opened on top (the map picker) handles itself.
+      if (document.querySelectorAll(".modal-overlay").length > 1) return;
+      requestClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
 
   if (!modal) return null;
 
@@ -551,8 +573,19 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit: 
 
   const isWide = modal.type === "add-item" || modal.type === "edit-item" || modal.type === "add-restaurant" || modal.type === "invite" || modal.type === "view-location" || modal.type === "view-route" || modal.type === "manage-permissions";
   return (
-    <div className="modal-overlay">
-      <div className={"modal" + (isWide ? " modal-wide" : "")} onClick={(e) => e.stopPropagation()}>
+    <div
+      className="modal-overlay"
+      // Closes only on a press that starts *and* ends on the backdrop, so
+      // selecting text inside and releasing outside doesn't close it.
+      onMouseDown={(e) => { pressedOverlayRef.current = e.target === e.currentTarget; }}
+      onClick={(e) => { if (pressedOverlayRef.current && e.target === e.currentTarget) requestClose(); pressedOverlayRef.current = false; }}
+    >
+      <div
+        className={"modal" + (isWide ? " modal-wide" : "")}
+        onClick={(e) => e.stopPropagation()}
+        onInput={() => { dirtyRef.current = true; }}
+        onChange={() => { dirtyRef.current = true; }}
+      >
         {/* Locks every field and button while a save is in flight. */}
         <fieldset className="modal-fieldset" disabled={busy} aria-busy={busy}>
           {content}

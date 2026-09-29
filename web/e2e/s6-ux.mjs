@@ -72,23 +72,25 @@ await tc("U-03", A, "입력창이 열린 상태에서 브라우저 '뒤로가기
     return { actual: `뒤로가기 후 주소 ${r.path}, 입력창 ${r.modal ? `"${r.title}" 그대로 열림 (${savedWrong})` : "닫힘"}`, status: r.modal ? "WARN" : "PASS", note: r.modal ? "뒤로가기로 여행 목록에 와도 '여행 정보 수정' 창이 남아 있고, 저장하면 오류가 남" : "" };
   });
 
-await tc("U-04", A, "입력창 닫기 — Esc 키 / 바깥 영역 클릭",
-  "'+ 날짜 추가' 창을 연 뒤 Esc → 다시 열고 바깥 어두운 영역 클릭",
-  "Esc나 바깥 클릭으로 닫히는 게 일반적",
+await tc("U-04", A, "입력창 닫기 — Esc 키 / 바깥 영역 클릭 (작성 중이면 확인)",
+  "'+ 날짜 추가' 창을 열고 바로 Esc → 다시 열어 요약을 입력한 뒤 바깥 어두운 영역 클릭",
+  "빈 창은 Esc로 바로 닫히고, 작성 중인 창은 '작성 중인 내용이 사라져요' 확인 후 닫힘",
   async () => {
     await openTrip();
     await click(p, "button", "+ 날짜 추가");
     await waitFor(p, () => !!document.querySelector(".modal"), { label: "modal" });
     await p.keyboard.press("Escape"); await wait(400);
     const esc = !(await modalOpen(p));
-    if (!esc) {
-      await p.mouse.click(5, 5); await wait(400);
-    } else {
-      await click(p, "button", "+ 날짜 추가"); await p.mouse.click(5, 5); await wait(400);
-    }
-    const outside = !(await modalOpen(p));
-    if (await modalOpen(p)) await click(p, ".modal button", "취소", { exact: true });
-    return { actual: `Esc로 닫힘: ${esc ? "예" : "아니오"}, 바깥 클릭으로 닫힘: ${outside ? "예" : "아니오"}`, status: esc || outside ? "PASS" : "WARN", note: esc || outside ? "" : "입력창을 '취소' 버튼으로만 닫을 수 있음 (Esc/바깥 클릭 미지원)" };
+    await click(p, "button", "+ 날짜 추가");
+    await waitFor(p, () => !!document.querySelector(".modal input[name=summary]"), { label: "modal" });
+    await p.type(".modal input[name=summary]", "작성 중");
+    p.__lastDialog = null;
+    await p.mouse.click(5, 5); await wait(500);
+    const asked = p.__lastDialog || "";
+    const closed = !(await modalOpen(p));
+    if (!closed) await click(p, ".modal button", "취소", { exact: true });
+    assert(esc && asked.includes("사라져요") && closed, JSON.stringify({ esc, asked, closed }));
+    return `빈 창 Esc로 닫힘 / 작성 중 바깥 클릭 → 확인 "${asked}" → 닫힘`;
   });
 
 await tc("U-05", A, "휴대폰(작은 화면)에서 새 여행 입력창",
