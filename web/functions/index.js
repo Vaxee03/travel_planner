@@ -210,6 +210,8 @@ exports.deleteAccount = onCall({ region: "us-central1" }, async (request) => {
     }
 
     const myReviews = (trip.reviews || []).filter((r) => r.authorId === uid);
+    const myEntry = trip.reviewsBy?.[uid];
+    if (myEntry) myReviews.push(myEntry);
     for (const r of myReviews) {
       for (const p of r.photos || []) {
         if (p.path) await bucket.file(p.path).delete().catch(() => {});
@@ -220,7 +222,8 @@ exports.deleteAccount = onCall({ region: "us-central1" }, async (request) => {
       memberIds: FieldValue.arrayRemove(uid),
       [`memberPermissions.${uid}`]: FieldValue.delete(),
     };
-    if (myReviews.length) update.reviews = trip.reviews.filter((r) => r.authorId !== uid);
+    if ((trip.reviews || []).some((r) => r.authorId === uid)) update.reviews = trip.reviews.filter((r) => r.authorId !== uid);
+    if (myEntry) update[`reviewsBy.${uid}`] = FieldValue.delete();
     if (trip.ownerId === uid) {
       update.ownerId = others[0];
       // The new 방장 has every permission anyway; drop their now-moot grants.

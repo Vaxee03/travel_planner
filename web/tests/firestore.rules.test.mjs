@@ -97,3 +97,11 @@ test("a member the 방장 removed can't rejoin until allowed again", async () =>
   await assertSucceeds(updateDoc(doc(db("owner"), "trips/t1"), { blockedIds: [] }));
   await assertSucceeds(updateDoc(doc(db("alice"), "trips/t1"), { memberIds: arrayUnion("alice") }));
 });
+
+test("reviews: each member can change only their own entry", async () => {
+  await assertSucceeds(updateDoc(doc(db("alice"), "trips/t1"), { "reviewsBy.alice": { text: "좋았어요", photos: [], updatedAt: 1 } }));
+  await assertFails(updateDoc(doc(db("bob"), "trips/t1"), { "reviewsBy.alice": { text: "내가 바꿈", photos: [], updatedAt: 2 } }));
+  await assertSucceeds(updateDoc(doc(db("bob"), "trips/t1"), { "reviewsBy.bob": { text: "저도요", photos: [], updatedAt: 3 } }));
+  // the old shared array is read-only, even for the 방장
+  await assertFails(updateDoc(doc(db("owner"), "trips/t1"), { reviews: [] }));
+});

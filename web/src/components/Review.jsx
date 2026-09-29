@@ -3,6 +3,7 @@ import { uploadReviewPhoto, deleteReviewPhoto, mutateTrip } from "../lib/tripsAp
 import { useNicknames } from "../lib/useNicknames";
 import { reportError } from "../lib/errorReporting";
 import { DEFAULT_NICKNAME } from "../lib/users";
+import { reviewPosts, myReviewDraft } from "../lib/utils";
 import { shrinkImage, MAX_PHOTO_BYTES } from "../lib/imageResize";
 
 /** A failed upload/save in words a traveller understands (the raw Firebase
@@ -19,7 +20,8 @@ export default function Review({ trip, uid, canReview, openModal, requestDelete 
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
 
-  const nicknames = useNicknames((trip.reviews || []).map((r) => r.authorId));
+  const posts = reviewPosts(trip);
+  const nicknames = useNicknames(posts.map((r) => r.authorId));
 
   if (!canReview) {
     return (
@@ -32,7 +34,6 @@ export default function Review({ trip, uid, canReview, openModal, requestDelete 
     );
   }
 
-  const posts = trip.reviews || [];
   const myPost = posts.find((r) => r.authorId === uid);
 
   async function handleFile(e) {
@@ -53,10 +54,9 @@ export default function Review({ trip, uid, canReview, openModal, requestDelete 
       }
       const { url, path } = await uploadReviewPhoto(trip.id, uid, file);
       await mutateTrip(trip.id, (t) => {
-        t.reviews = t.reviews || [];
-        const idx = t.reviews.findIndex((r) => r.authorId === uid);
-        if (idx >= 0) t.reviews[idx].photos = [...(t.reviews[idx].photos || []), { url, path }];
-        else t.reviews.push({ authorId: uid, text: "", photos: [{ url, path }], updatedAt: Date.now() });
+        const mine = myReviewDraft(t, uid);
+        mine.photos = [...(mine.photos || []), { url, path }];
+        mine.updatedAt = Date.now();
       });
     } catch (err) {
       reportError(err, "review-photo-upload");
@@ -69,9 +69,8 @@ export default function Review({ trip, uid, canReview, openModal, requestDelete 
 
   async function handleDeletePhoto(photo) {
     await mutateTrip(trip.id, (t) => {
-      const idx = (t.reviews || []).findIndex((r) => r.authorId === uid);
-      if (idx < 0) return;
-      t.reviews[idx].photos = (t.reviews[idx].photos || []).filter((p) => p.path !== photo.path);
+      const mine = myReviewDraft(t, uid);
+      mine.photos = (mine.photos || []).filter((p) => p.path !== photo.path);
     });
     deleteReviewPhoto(photo.path);
   }

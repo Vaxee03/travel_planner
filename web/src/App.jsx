@@ -9,7 +9,7 @@ import { randomNickname } from "./lib/randomNickname";
 import {
   checklistItemId, copyChecklist, daysBetween, ensureChecklistIds, makeChecklistId, shiftDate,
   locateDay, locateItem, stableStringify, StaleEditError, FormError, fmtDate, normalizeLink,
-  datesInRange, emptyDay, outsideTrip,
+  datesInRange, emptyDay, outsideTrip, myReviewDraft,
 } from "./lib/utils";
 import { computePerms, PERMISSION_CATEGORIES } from "./lib/permissions";
 import Home from "./components/Home";
@@ -260,8 +260,11 @@ export default function App() {
           t.bookings.splice(locateItem(t.bookings, m.idx, seen), 1);
         }));
       } else if (m.onYes === "delete-review") {
+        // Only ever your own (see Review.jsx); a tombstone also hides any
+        // older post of yours in the legacy shared array.
         await mutateTrip(tripId, (t) => {
-          t.reviews = (t.reviews || []).filter((r) => r.authorId !== m.authorId);
+          t.reviewsBy = t.reviewsBy || {};
+          t.reviewsBy[user.uid] = { deleted: true, updatedAt: Date.now() };
         });
       }
       closeModal();
@@ -484,10 +487,9 @@ export default function App() {
     }
     if (m.type === "edit-review") {
       await mutateTrip(tripId, (t) => {
-        t.reviews = t.reviews || [];
-        const idx = t.reviews.findIndex((r) => r.authorId === user.uid);
-        if (idx >= 0) t.reviews[idx] = { ...t.reviews[idx], text: values.text, updatedAt: Date.now() };
-        else t.reviews.push({ authorId: user.uid, text: values.text, photos: [], updatedAt: Date.now() });
+        const mine = myReviewDraft(t, user.uid);
+        mine.text = values.text;
+        mine.updatedAt = Date.now();
       });
       closeModal();
       return;

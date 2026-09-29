@@ -217,6 +217,29 @@ export function saveBlobAsFile(filename, dataOrBlob) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/** Review posts live in trip.reviewsBy[authorId] — one entry per member,
+ * which the security rules let only that member change. Trips from before
+ * that still have the old shared trip.reviews array; those posts keep
+ * showing until their author edits or deletes them (which writes their
+ * reviewsBy entry, taking precedence — {deleted:true} hides the old post). */
+export function reviewPosts(trip) {
+  const by = trip?.reviewsBy || {};
+  const legacy = (trip?.reviews || []).filter((r) => r.authorId && !(r.authorId in by));
+  const current = Object.entries(by).filter(([, r]) => r && !r.deleted).map(([authorId, r]) => ({ ...r, authorId }));
+  return [...legacy, ...current].sort((a, b) => (a.updatedAt || 0) - (b.updatedAt || 0));
+}
+
+/** The draft-editable review of `uid` inside a mutateTrip draft: their
+ * reviewsBy entry, seeded from their legacy post the first time. */
+export function myReviewDraft(t, uid) {
+  t.reviewsBy = t.reviewsBy || {};
+  if (!t.reviewsBy[uid] || t.reviewsBy[uid].deleted) {
+    const old = (t.reviews || []).find((r) => r.authorId === uid && !(t.reviewsBy[uid]?.deleted));
+    t.reviewsBy[uid] = { text: old?.text || "", photos: old?.photos || [], updatedAt: Date.now() };
+  }
+  return t.reviewsBy[uid];
+}
+
 export function emptyTrip(overrides) {
   return {
     title: "", destination: "", startDate: "", endDate: "", travelers: 1, budgetTotal: 0,

@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useJsApiLoader } from "@react-google-maps/api";
 import { reportFormProblem } from "../lib/formProblem";
 import { unblockMember } from "../lib/tripsApi";
-import { fmtDate, itemKind, FormError, datesInRange } from "../lib/utils";
+import { fmtDate, itemKind, FormError, datesInRange, reviewPosts } from "../lib/utils";
 import { MAPS_LOADER_OPTIONS } from "../lib/mapsLoader";
 import { fetchCitySuggestions, findPlaceLocation, INTERNATIONAL_REGION_CODES } from "../lib/placeSearch";
 import { EXTRA_INTERNATIONAL_DESTINATIONS } from "../lib/extraDestinations";
@@ -559,7 +559,7 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit: 
       </form>
     );
   } else if (modal.type === "edit-review") {
-    const myPost = (trip.reviews || []).find((r) => r.authorId === modal.uid);
+    const myPost = reviewPosts(trip).find((r) => r.authorId === modal.uid);
     content = (
       <form onSubmit={handleSubmit}>
         <h3>내 여행 후기</h3>

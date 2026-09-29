@@ -74,7 +74,13 @@ service cloud.firestore {
           (!changed.hasAny(['days', 'itineraryMemo']) || hasPerm('itinerary')) &&
           (!changed.hasAny(['budgetItems']) || hasPerm('budget')) &&
           (!changed.hasAny(['checklist']) || hasPerm('checklist')) &&
-          (!changed.hasAny(['bookings']) || hasPerm('bookings'));
+          (!changed.hasAny(['bookings']) || hasPerm('bookings')) &&
+          // Reviews: each member writes only their own reviewsBy entry; the
+          // old shared reviews array is read-only (only account deletion,
+          // server-side, still edits it).
+          !changed.hasAny(['reviews']) &&
+          (!changed.hasAny(['reviewsBy']) ||
+            request.resource.data.get('reviewsBy', {}).diff(resource.data.get('reviewsBy', {})).affectedKeys().hasOnly([request.auth.uid]));
       }
     }
 

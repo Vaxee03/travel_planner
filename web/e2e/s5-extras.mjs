@@ -292,13 +292,13 @@ await tc("V-06", A3, "아주 큰 실제 사진(3000x3000, 20MB 이상) 업로드
     });
     fs.writeFileSync(bigReal, Buffer.from(dataUrl.split(",")[1], "base64"));
     const mb = (fs.statSync(bigReal).size / 1024 / 1024).toFixed(1);
-    const before = (await fsGet(`trips/${PAST_ID}`)).reviews[0].photos.length;
+    const before = (await fsGet(`trips/${PAST_ID}`)).reviewsBy[O].photos.length;
     const input = await po.$("input[type=file]");
     await input.uploadFile(bigReal);
     await waitFor(po, async () => true, { timeout: 1 });
     const end = Date.now() + 60000;
     let after = before;
-    while (Date.now() < end && after === before) { await wait(1000); after = ((await fsGet(`trips/${PAST_ID}`)).reviews[0].photos || []).length; }
+    while (Date.now() < end && after === before) { await wait(1000); after = ((await fsGet(`trips/${PAST_ID}`)).reviewsBy[O].photos || []).length; }
     const note = await po.evaluate(() => [...document.querySelectorAll(".note")].map((n) => n.innerText).join(" "));
     assert(after === before + 1, `원본 ${mb}MB, 업로드 안 됨: ${note}`);
     return `원본 ${mb}MB → 자동으로 줄여서 업로드 성공`;
@@ -309,7 +309,7 @@ await tc("V-05", A3, "사진 삭제 / 후기 삭제",
   "사진·후기가 사라지고 저장소에서도 파일 삭제",
   async () => {
     const before = await fsGet(`trips/${PAST_ID}`);
-    const path = before.reviews[0].photos[0].path;
+    const path = before.reviewsBy[O].photos[0].path;
     await po.evaluate(() => document.querySelector(".photo-del").click());
     await wait(1500);
     const exists = await fetch(`http://127.0.0.1:9199/v0/b/${PROJECT}.appspot.com/o/${encodeURIComponent(path)}`, { headers: { Authorization: "Bearer owner" } }).then((r) => r.status).catch(() => 0);
@@ -318,8 +318,28 @@ await tc("V-05", A3, "사진 삭제 / 후기 삭제",
     await click(po, ".modal button", "삭제", { exact: true });
     await wait(1200);
     const t = await fsGet(`trips/${PAST_ID}`);
-    assert((t.reviews || []).length === 0 && exists !== 200 && exists2 !== 200, JSON.stringify({ reviews: t.reviews, exists, exists2 }));
+    assert(t.reviewsBy?.[O]?.deleted === true && exists !== 200 && exists2 !== 200, JSON.stringify({ reviews: t.reviews, exists, exists2 }));
     return `사진 파일 삭제 확인(저장소 응답 ${exists}/${exists2}), 후기 삭제`;
+  });
+
+await tc("V-07", A3, "예전 방식으로 저장된 후기 표시·수정 (데이터 이전)",
+  "예전 공용 목록에 민수·지은 후기가 있는 여행 → 후기 탭 확인 → 민수가 자기 후기 수정",
+  "두 후기가 모두 보이고, 민수 수정 후에도 중복 없이 2개, 지은 후기에는 민수의 수정·삭제 버튼 없음",
+  async () => {
+    const LEG = `legacy${stamp}`;
+    await fsSet(`trips/${LEG}`, { ownerId: O, memberIds: [O, B], title: "E2E 옛 후기", destination: "부산", tripType: "domestic", startDate: isoDay(-20), endDate: isoDay(-18), days: [],
+      reviews: [{ authorId: O, text: "민수 옛 후기", photos: [], updatedAt: 1 }, { authorId: B, text: "지은 옛 후기", photos: [], updatedAt: 2 }] });
+    await openTrip(po, LEG, "review");
+    const before = await po.evaluate(() => [...document.querySelectorAll(".review-text")].map((e) => e.innerText));
+    await click(po, "button", "내 후기 수정");
+    await fill(po, { text: "민수 새 후기" });
+    await submitModal(po);
+    await wait(1200);
+    const after = await po.evaluate(() => [...document.querySelectorAll(".review-text")].map((e) => e.innerText));
+    const delBtns = await po.evaluate(() => [...document.querySelectorAll(".card")].filter((c) => c.innerText.includes("지은 옛 후기")).map((c) => c.querySelectorAll("button").length)[0]);
+    const t = await fsGet(`trips/${LEG}`);
+    assert(before.length === 2 && after.length === 2 && after.includes("민수 새 후기") && after.includes("지은 옛 후기") && delBtns === 0 && t.reviewsBy?.[O]?.text === "민수 새 후기" && t.reviews.length === 2, JSON.stringify({ before, after, delBtns, by: t.reviewsBy }));
+    return `수정 전 ${before.join(" / ")} → 수정 후 ${after.join(" / ")} (새 방식으로 이전, 옛 목록은 그대로)`;
   });
 
 // ---- account deletion ----------------------------------------------------------
@@ -343,7 +363,7 @@ await tc("X-02", A4, "회원 탈퇴 실행 — 데이터 정리",
   async () => {
     await fsSet(`trips/solo${stamp}`, { ownerId: B, memberIds: [B], title: "지은 혼자", startDate: isoDay(5), endDate: isoDay(6), days: [] });
     await fsSet(`trips/owned${stamp}`, { ownerId: B, memberIds: [B, O], title: "지은 방장", startDate: isoDay(5), endDate: isoDay(6), days: [] });
-    await fsSet(`trips/${PAST_ID}?updateMask.fieldPaths=reviews`, { reviews: [{ authorId: B, text: "지은 후기", photos: [], updatedAt: Date.now() }] });
+    await fsSet(`trips/${PAST_ID}?updateMask.fieldPaths=reviews&updateMask.fieldPaths=reviewsBy`, { reviews: [{ authorId: B, text: "지은 옛 후기", photos: [], updatedAt: Date.now() }], reviewsBy: { [B]: { text: "지은 후기", photos: [], updatedAt: Date.now() } } });
     await click(pb, ".modal button", "탈퇴하기");
     await waitFor(pb, () => !!document.querySelector(".lp"), { label: "landing after delete", timeout: 30000 });
     const solo = await fsGet(`trips/solo${stamp}`);
@@ -351,7 +371,7 @@ await tc("X-02", A4, "회원 탈퇴 실행 — 데이터 정리",
     const past = await fsGet(`trips/${PAST_ID}`);
     const user = await fsGet(`users/${B}`);
     const acct = await (await fetch(`http://127.0.0.1:9299/identitytoolkit.googleapis.com/v1/projects/${PROJECT}/accounts:lookup`, { method: "POST", headers: { Authorization: "Bearer owner", "Content-Type": "application/json" }, body: JSON.stringify({ localId: [B] }) })).json();
-    const r = { soloDeleted: !solo, ownedOwner: owned?.ownerId === O && !owned.memberIds.includes(B), pastLeft: !past.memberIds.includes(B), reviewGone: !(past.reviews || []).some((x) => x.authorId === B), userDeleted: !user, authDeleted: !(acct.users || []).length };
+    const r = { soloDeleted: !solo, ownedOwner: owned?.ownerId === O && !owned.memberIds.includes(B), pastLeft: !past.memberIds.includes(B), reviewGone: !(past.reviews || []).some((x) => x.authorId === B) && !(past.reviewsBy || {})[B], userDeleted: !user, authDeleted: !(acct.users || []).length };
     assert(Object.values(r).every(Boolean), JSON.stringify(r));
     return "혼자 여행 삭제 · 방장 위임 · 참여 여행 탈퇴 · 후기 삭제 · 닉네임/계정 삭제 모두 확인";
   });
