@@ -17,6 +17,8 @@ export default function Budget({ trip, openModal, requestDelete, canEdit }) {
   const total = Number(trip.budgetTotal) || 0;
   const pct = total > 0 ? Math.min(100, Math.round((spent / total) * 100)) : 0;
   const travelers = Number(trip.travelers) || 1;
+  // Per-person figures are rounded for display; say so when they don't divide evenly.
+  const perPerson = (n) => `${n % travelers ? "약 " : ""}${fmtMoney(Math.round(n / travelers))}원`;
 
   const byCat = {};
   items.forEach((it) => {
@@ -47,7 +49,7 @@ export default function Budget({ trip, openModal, requestDelete, canEdit }) {
           <div className="card" style={{ marginTop: 16 }}>
             <div className="cat-row" style={{ borderBottom: "none" }}>
               <span className="cat-name">1인당 ({travelers}명 기준)</span>
-              <span className="cat-amt nums">지출 {fmtMoney(Math.round(spent / travelers))}원 · 예산 {fmtMoney(Math.round(total / travelers))}원</span>
+              <span className="cat-amt nums">지출 {perPerson(spent)} · 예산 {perPerson(total)}</span>
             </div>
           </div>
         )}
@@ -68,6 +70,11 @@ export default function Budget({ trip, openModal, requestDelete, canEdit }) {
                   <span className="cat-amt nums">{fmtMoney(tr.amount)}원</span>
                 </div>
               ))}
+            </div>
+          )}
+          {settlement.roundedUp > 0 && settlement.transfers.length > 0 && (
+            <div className="section-note" style={{ marginTop: 8 }}>
+              딱 나누어떨어지지 않는 금액은 1원 단위까지 맞춰 계산했어요. 남는 몇 원은 일부 동행자가 1원씩 더 부담해요.
             </div>
           )}
           {settlement.unassigned > 0 && (

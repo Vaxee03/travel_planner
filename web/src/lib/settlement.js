@@ -14,6 +14,7 @@ function splitWon(amount, n) {
 export function computeSettlement(items, memberIds) {
   const balance = {}; // + means others owe them, − means they owe
   let unassigned = 0;
+  let roundedUp = 0; // expenses whose split left odd won on some sharers
 
   (items || []).forEach((it) => {
     const amount = Math.round(Number(it.amount) || 0);
@@ -21,6 +22,7 @@ export function computeSettlement(items, memberIds) {
     if (!it.paidBy) { unassigned += 1; return; }
     const among = (it.splitAmong?.length ? it.splitAmong : memberIds).filter(Boolean);
     if (!among.length) return;
+    if (amount % among.length) roundedUp += 1;
     balance[it.paidBy] = (balance[it.paidBy] || 0) + amount;
     splitWon(amount, among.length).forEach((share, i) => {
       balance[among[i]] = (balance[among[i]] || 0) - share;
@@ -45,5 +47,5 @@ export function computeSettlement(items, memberIds) {
     if (debtors[di].v === 0) di += 1;
   }
 
-  return { transfers, balance, unassigned };
+  return { transfers, balance, unassigned, roundedUp };
 }

@@ -38,3 +38,8 @@ test("items without a payer are skipped and counted", () => {
   assert.equal(unassigned, 1);
   assert.equal(transfers.length, 2);
 });
+
+test("counts expenses whose split leaves odd won", () => {
+  assert.equal(computeSettlement([{ amount: 10000, paidBy: "a" }], members).roundedUp, 1);
+  assert.equal(computeSettlement([{ amount: 9000, paidBy: "a" }], members).roundedUp, 0);
+});
