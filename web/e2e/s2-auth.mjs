@@ -64,22 +64,27 @@ await tc("AU-03", A, "닉네임 수정 — 빈 값 저장",
   });
 
 await tc("AU-04", A, "닉네임 수정 — 아주 긴 닉네임(40자)",
-  "닉네임을 40자로 저장 후 헤더 확인",
-  "저장되고 헤더가 가로로 넘치지 않음",
+  "닉네임 칸에 40자를 입력(붙여넣기)해 저장 → 20자로 다시 저장 후 헤더 확인",
+  "20자 제한 안내로 저장이 막히고, 20자는 저장되며 헤더가 가로로 넘치지 않음",
   async () => {
     if (!(await modalOpen(p1))) await click(p1, "button", "닉네임 수정", { exact: true });
-    const long = "아주아주긴닉네임테스트".repeat(4);
-    await fill(p1, { nickname: long });
+    await fill(p1, { nickname: "아주아주긴닉네임테스트".repeat(4) });
+    await submitModal(p1);
+    await wait(800);
+    const note = await p1.evaluate(() => [...document.querySelectorAll(".modal .note")].map((n) => n.innerText).join(" "));
+    const maxAttr = await p1.$eval(".modal input[name=nickname]", (i) => i.maxLength).catch(() => -1);
+    await fill(p1, { nickname: "스무글자닉네임테스트스무글자닉네임테스트" });
     await submitModal(p1);
     await wait(800);
     const r = await p1.evaluate(() => ({ overflow: document.documentElement.scrollWidth - innerWidth, shown: document.querySelector("header.top span[style*='nickname']")?.innerText.length }));
     await p1.setViewport({ width: 390, height: 800, isMobile: true });
-    await wait(500);
+    await waitFor(p1, () => !!document.querySelector("header.top"), { label: "reload" }); await wait(800);
     const mob = await p1.evaluate(() => document.documentElement.scrollWidth - innerWidth);
     await shot(p1, "long-nickname-mobile", { clip: { x: 0, y: 0, width: 390, height: 260 } });
     await p1.setViewport({ width: 1280, height: 900 });
-    const bad = r.overflow > 0 || mob > 0;
-    return { actual: `저장된 글자 수 ${r.shown}, 가로 넘침 데스크톱 ${r.overflow}px / 휴대폰 ${mob}px`, status: bad ? "WARN" : "PASS", note: `닉네임 길이 제한 없음${bad ? ", 휴대폰에서 화면이 가로로 넘침" : ""}` };
+    await waitFor(p1, () => !!document.querySelector("header.top"), { label: "reload" }); await wait(800);
+    assert(note.includes("20자") && r.shown === 20 && r.overflow <= 0 && mob <= 0, JSON.stringify({ note, maxAttr, ...r, mob }));
+    return `40자: "${note}" (입력칸 최대 ${maxAttr}자) / 20자 저장, 가로 넘침 데스크톱 ${r.overflow}px · 휴대폰 ${mob}px`;
   });
 
 await tc("AU-05", A, "로그아웃",

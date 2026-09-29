@@ -1,17 +1,16 @@
 import { useEffect, useState } from "react";
-import { fetchNicknames } from "./users";
+import { watchNicknames } from "./users";
 
-/** Resolves a list of uids to a { uid: nickname } map, refetching whenever
- * the (order-independent) set of uids changes. */
+/** Resolves a list of uids to a { uid: nickname } map that stays up to date
+ * as people change their nicknames (and re-subscribes when the set of uids
+ * changes). */
 export function useNicknames(uids) {
   const key = [...new Set((uids || []).filter(Boolean))].sort().join(",");
   const [map, setMap] = useState({});
 
   useEffect(() => {
     if (!key) { setMap({}); return; }
-    let cancelled = false;
-    fetchNicknames(key.split(",")).then((m) => { if (!cancelled) setMap(m); });
-    return () => { cancelled = true; };
+    return watchNicknames(key.split(","), setMap);
   }, [key]);
 
   return map;

@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Link, matchPath, useLocation, useNavigate } from "react-router-dom";
 import { firebaseReady, watchAuth, signOutUser, deleteMyAccount } from "./lib/firebase";
 import { subscribeTrips, createTrip, mutateTrip, deleteTrip, joinTrip, removeMember, setChecklistDone, setPublicShareId } from "./lib/tripsApi";
-import { fetchNickname, setNickname } from "./lib/users";
+import { fetchNickname, setNickname, NICKNAME_MAX } from "./lib/users";
 import { randomNickname } from "./lib/randomNickname";
 import {
   checklistItemId, copyChecklist, daysBetween, ensureChecklistIds, makeChecklistId, shiftDate,
@@ -266,10 +266,10 @@ export default function App() {
 
     if (m.type === "set-nickname" || m.type === "edit-nickname") {
       const nick = (values.nickname || "").trim();
-      if (nick) {
-        await setNickname(user.uid, nick);
-        setNicknameState(nick);
-      }
+      if (!nick) throw new FormError("닉네임을 입력해주세요.");
+      if (nick.length > NICKNAME_MAX) throw new FormError(`닉네임은 ${NICKNAME_MAX}자까지 쓸 수 있어요.`);
+      await setNickname(user.uid, nick);
+      setNicknameState(nick);
       closeModal();
       return;
     }

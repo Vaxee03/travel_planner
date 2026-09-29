@@ -83,3 +83,9 @@ test("ownership can only go to an existing member", async () => {
   await assertFails(updateDoc(doc(db("owner"), "trips/t1"), { ownerId: "stranger" }));
   await assertSucceeds(updateDoc(doc(db("owner"), "trips/t1"), { ownerId: "alice" }));
 });
+
+test("nicknames: only your own, 1–20 characters", async () => {
+  await assertSucceeds(setDoc(doc(db("alice"), "users/alice"), { nickname: "여행러버", updatedAt: 1 }));
+  await assertFails(setDoc(doc(db("alice"), "users/alice"), { nickname: "가".repeat(21), updatedAt: 1 }));
+  await assertFails(setDoc(doc(db("alice"), "users/bob"), { nickname: "남의 닉네임", updatedAt: 1 }));
+});

@@ -13,14 +13,14 @@ import RouteMapViewer from "./RouteMapViewer";
 import { reportError } from "../lib/errorReporting";
 import { shareLink, shareButtonLabel } from "../lib/share";
 import { useNicknames } from "../lib/useNicknames";
-import { DEFAULT_NICKNAME } from "../lib/users";
+import { DEFAULT_NICKNAME, NICKNAME_MAX } from "../lib/users";
 import { PERMISSION_CATEGORIES } from "../lib/permissions";
 
-function Field({ name, label, type = "text", placeholder, required, defaultValue, min }) {
+function Field({ name, label, type = "text", placeholder, required, defaultValue, min, maxLength }) {
   return (
     <div className="field">
       <label>{label}</label>
-      <input name={name} type={type} placeholder={placeholder} required={required} defaultValue={defaultValue} min={min} />
+      <input name={name} type={type} placeholder={placeholder} required={required} defaultValue={defaultValue} min={min} maxLength={maxLength} />
     </div>
   );
 }
@@ -499,13 +499,14 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit: 
       <form onSubmit={handleSubmit} noValidate>
         <h3>{isEdit ? "닉네임 수정" : "닉네임을 설정해주세요"}</h3>
         {!isEdit && <p style={{ margin: "0 0 14px", color: "var(--ink-soft)", fontSize: 13.5 }}>동행자들에게 보여질 이름이에요. 마음에 안 들면 자유롭게 바꾸고, 나중에 언제든 다시 바꿀 수 있어요.</p>}
-        <Field name="nickname" label="닉네임" placeholder="예: 여행러버" defaultValue={isEdit ? (modal.currentNickname || "") : modal.suggested || ""} />
+        <Field name="nickname" label={`닉네임 (최대 ${NICKNAME_MAX}자)`} placeholder="예: 여행러버" maxLength={NICKNAME_MAX} defaultValue={isEdit ? (modal.currentNickname || "") : modal.suggested || ""} />
         <FormNote message={formError} />
         {isEdit ? (
           <Actions submitLabel="저장" onClose={onClose} />
         ) : (
           <div className="modal-actions">
-            <button type="button" className="btn" onClick={() => onSubmit(modal, { nickname: modal.suggested || "" })}>나중에 하기</button>
+            {/* Really later: nothing is saved; the header shows "닉네임 없음" until one is set. */}
+            <button type="button" className="btn" onClick={onClose}>나중에 하기</button>
             <button type="submit" className="btn btn-primary">저장</button>
           </div>
         )}
