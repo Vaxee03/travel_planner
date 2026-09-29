@@ -17,6 +17,27 @@ function recErrorMessage(err) {
   return "지금은 맛집 추천을 받을 수 없어요. 잠시 후 다시 시도해주세요.";
 }
 
+/** The last recommendation per trip is kept in this browser only (not in the
+ * trip, so companions' lists never overwrite each other), so it survives a
+ * reload or switching tabs. Storage can be unavailable (private mode, blocked
+ * site data) — then it's simply not kept. */
+const recKey = (tripId) => `tp:recs:${tripId}`;
+function loadSavedRec(tripId) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(recKey(tripId)) || "null");
+    return saved && Array.isArray(saved.rec?.items) ? saved : null;
+  } catch {
+    return null;
+  }
+}
+function saveRec(tripId, preferences, rec) {
+  try {
+    localStorage.setItem(recKey(tripId), JSON.stringify({ preferences, rec }));
+  } catch {
+    /* not kept */
+  }
+}
+
 /** Dates of the days that already hold an item added from this
  * recommendation (tagged with `restaurant` when it was added). */
 function addedDates(trip, name) {
@@ -26,18 +47,28 @@ function addedDates(trip, name) {
 }
 
 export default function Restaurants({ trip, openModal, canAddToItinerary }) {
-  const [preferences, setPreferences] = useState("");
+  const [preferences, setPreferences] = useState(() => loadSavedRec(trip.id)?.preferences || "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  // Results live only in this tab's state (not saved to the trip), so they
-  // reset whenever the user leaves the tab, opens another trip or reloads.
-  const [rec, setRec] = useState(null);
+  const [rec, setRec] = useState(() => loadSavedRec(trip.id)?.rec || null);
+
+  // Another trip in the same component instance → show that trip's saved list.
+  const [shownTripId, setShownTripId] = useState(trip.id);
+  if (shownTripId !== trip.id) {
+    const saved = loadSavedRec(trip.id);
+    setShownTripId(trip.id);
+    setPreferences(saved?.preferences || "");
+    setRec(saved?.rec || null);
+    setError(null);
+  }
 
   async function handleFetch() {
     setLoading(true);
     setError(null);
     try {
-      setRec(await fetchRestaurantRecommendations(trip.destination, preferences, trip.tripType));
+      const result = await fetchRestaurantRecommendations(trip.destination, preferences, trip.tripType);
+      setRec(result);
+      saveRec(trip.id, preferences, result);
     } catch (err) {
       // Hitting the daily limit is expected, not a bug worth reporting.
       if (err?.code !== "functions/resource-exhausted") reportError(err, "restaurant-recs");
