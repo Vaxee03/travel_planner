@@ -1,4 +1,6 @@
+import { useRef } from "react";
 import { ddayLabel, fmtMoney, tripStatus } from "../lib/utils";
+import { useScrollHint } from "../lib/useScrollHint";
 import { downloadTripIcs } from "../lib/ics";
 import { useNicknames } from "../lib/useNicknames";
 import { DEFAULT_NICKNAME } from "../lib/users";
@@ -33,6 +35,11 @@ export default function TripDetail({ trip, uid, perms, tab, setTab, dayIdx, setD
     });
   }
 
+  const actionsRef = useRef(null);
+  const tabsRef = useRef(null);
+  useScrollHint(actionsRef);
+  useScrollHint(tabsRef);
+
   const st = tripStatus(trip);
   const dday = ddayLabel(trip);
   const canReview = st === "completed";
@@ -62,7 +69,7 @@ export default function TripDetail({ trip, uid, perms, tab, setTab, dayIdx, setD
             </div>
           )}
         </div>
-        <div className="btn-row trip-actions">
+        <div className="btn-row trip-actions" ref={actionsRef}>
           <button className="btn btn-sm" onClick={() => openModal({ type: "invite" })}>🎟 동행자 초대</button>
           <button className="btn btn-sm" onClick={confirmIcsExport}>📅 캘린더로 내보내기</button>
           <button className="btn btn-sm" onClick={() => openModal({ type: "duplicate-trip" })}>📋 여행 복제</button>
@@ -110,7 +117,7 @@ export default function TripDetail({ trip, uid, perms, tab, setTab, dayIdx, setD
         </div>
       </div>
 
-      <div className="tabbar">
+      <div className="tabbar" ref={tabsRef}>
         {TABS.map((t) => (
           <button
             key={t.key}

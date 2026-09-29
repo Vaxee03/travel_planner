@@ -350,6 +350,10 @@ footer.app-footer .footer-links a, footer.app-footer .footer-links .btn-ghost{ c
   }
   .trip-actions::-webkit-scrollbar, .tabbar::-webkit-scrollbar{ display:none; }
   .trip-actions > *, .tabbar > *{ flex-shrink:0; white-space:nowrap; }
+  /* Fade whichever edge still has buttons hidden behind it (useScrollHint). */
+  .trip-actions.more-right, .tabbar.more-right{ -webkit-mask-image:linear-gradient(to right, #000 calc(100% - 40px), transparent); mask-image:linear-gradient(to right, #000 calc(100% - 40px), transparent); }
+  .trip-actions.more-left, .tabbar.more-left{ -webkit-mask-image:linear-gradient(to left, #000 calc(100% - 40px), transparent); mask-image:linear-gradient(to left, #000 calc(100% - 40px), transparent); }
+  .trip-actions.more-left.more-right, .tabbar.more-left.more-right{ -webkit-mask-image:linear-gradient(to right, transparent, #000 40px, #000 calc(100% - 40px), transparent); mask-image:linear-gradient(to right, transparent, #000 40px, #000 calc(100% - 40px), transparent); }
   .tabbar{ margin-bottom:20px; }
   .tab{ margin-right:10px; font-size:15.5px; }
 

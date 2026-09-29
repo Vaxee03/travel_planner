@@ -115,21 +115,21 @@ await tc("U-05", A, "휴대폰(작은 화면)에서 새 여행 입력창",
     return `창 너비 ${r.modalW}px, 내부 스크롤 ${r.modalScroll ? "있음" : "불필요"}, 버튼 도달 가능, 가로 넘침 없음`;
   });
 
-await tc("U-06", A, "휴대폰에서 여행 화면 탭·버튼 줄",
-  "375px 화면에서 여행 상세 화면 확인",
-  "탭과 기능 버튼 줄이 가로 스크롤로 모두 접근 가능, 페이지 가로 넘침 없음",
+await tc("U-06", A, "휴대폰에서 여행 화면 탭·버튼 줄 (밀 수 있다는 표시)",
+  "375px 화면에서 여행 상세 화면의 기능 버튼 줄 확인 → 끝까지 밀기",
+  "가로 넘침 없음, 가려진 버튼이 있는 쪽 끝이 흐리게 표시되고 끝까지 밀면 사라짐",
   async () => {
     await p.setViewport({ width: 375, height: 667, isMobile: true, hasTouch: true });
     await openTrip();
-    const r = await p.evaluate(() => {
-      const tb = document.querySelector(".tabbar"), ta = document.querySelector(".trip-actions");
-      return { overflow: document.documentElement.scrollWidth - innerWidth, tabScroll: tb.scrollWidth > tb.clientWidth ? getComputedStyle(tb).overflowX : "fits", actScroll: ta.scrollWidth > ta.clientWidth ? getComputedStyle(ta).overflowX : "fits" };
-    });
+    await wait(500);
+    const r1 = await p.evaluate(() => { const ta = document.querySelector(".trip-actions"); return { overflow: document.documentElement.scrollWidth - innerWidth, scrollable: ta.scrollWidth > ta.clientWidth, cls: ta.className, mask: getComputedStyle(ta).maskImage || getComputedStyle(ta).webkitMaskImage }; });
     await shot(p, "mobile-trip");
+    await p.evaluate(() => { const ta = document.querySelector(".trip-actions"); ta.scrollLeft = ta.scrollWidth; });
+    await wait(400);
+    const r2 = await p.evaluate(() => document.querySelector(".trip-actions").className);
     await p.setViewport({ width: 1280, height: 900 });
-    assert(r.overflow <= 0 && r.tabScroll !== "visible" && r.actScroll !== "visible", JSON.stringify(r));
-    const hidden = r.actScroll !== "fits";
-    return { actual: `가로 넘침 ${r.overflow}px, 탭 줄: ${r.tabScroll}, 기능 버튼 줄: ${r.actScroll}`, status: hidden ? "WARN" : "PASS", note: hidden ? "휴대폰에서 기능 버튼 일부가 화면 밖에 있어 옆으로 밀어야 보임 — 밀 수 있다는 표시가 없음" : "" };
+    assert(r1.overflow <= 0 && r1.scrollable && r1.cls.includes("more-right") && r1.mask !== "none" && r2.includes("more-left") && !r2.includes("more-right"), JSON.stringify({ r1, r2 }));
+    return `처음: 오른쪽 끝 흐림 표시 / 끝까지 민 뒤: 왼쪽 끝만 흐림, 가로 넘침 ${r1.overflow}px`;
   });
 
 await tc("U-07", A, "여행 화면에서 로그아웃",
