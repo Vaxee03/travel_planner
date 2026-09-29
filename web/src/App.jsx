@@ -12,6 +12,8 @@ import {
   datesInRange, emptyDay, outsideTrip, myReviewDraft,
 } from "./lib/utils";
 import { computePerms, PERMISSION_CATEGORIES } from "./lib/permissions";
+import { isNativeApp } from "./lib/platform";
+import { useNativeShell } from "./lib/useNativeShell";
 import Home from "./components/Home";
 import AuthGate from "./components/AuthGate";
 
@@ -27,7 +29,10 @@ const PrivacyPage = lazy(() => import("./components/LegalPage").then((m) => ({ d
 // right away there so it isn't waiting on the auth check to begin loading.
 const loadLanding = () => import("./components/Landing");
 const Landing = lazy(loadLanding);
-if (typeof window !== "undefined" && window.location.pathname === "/") loadLanding();
+if (typeof window !== "undefined" && window.location.pathname === "/" && !isNativeApp) loadLanding();
+// The site's landing page introduces the service to visitors; the installed
+// app skips it and opens straight on the login screen / trip list.
+const LANDING_HOME = isNativeApp ? "/" : "/about";
 
 const TAB_KEYS = ["itinerary", "budget", "checklist", "bookings", "restaurants", "review"];
 
@@ -46,6 +51,7 @@ export default function App() {
   // /join/:tripId) so a refresh or a shared link lands on the same view.
   const location = useLocation();
   const navigate = useNavigate();
+  useNativeShell({ navigate, location });
   const tripMatch = matchPath("/trip/:tripId/:tab?", location.pathname);
   const joinMatch = matchPath("/join/:tripId", location.pathname);
   const shareMatch = matchPath("/share/:shareId", location.pathname);
@@ -96,7 +102,7 @@ export default function App() {
   // Any other path (typo, old bookmark) just falls back to the trip list.
   const legalPage = location.pathname === "/terms" ? "terms" : location.pathname === "/privacy" ? "privacy" : null;
   const loginPage = location.pathname === "/login";
-  const aboutPage = location.pathname === "/about";
+  const aboutPage = location.pathname === "/about" && !isNativeApp;
   const knownPath = Boolean(location.pathname === "/" || loginPage || aboutPage || tripMatch || joinMatch || shareMatch || legalPage);
   useEffect(() => {
     if (!knownPath) navigate("/", { replace: true });
@@ -501,7 +507,7 @@ export default function App() {
   // nothing there so a signed-in user doesn't see the landing flash by.
   // /about shows the same landing page to signed-in users too (the header
   // logo links there), with its buttons pointing back to their trips.
-  const onLandingPath = (location.pathname === "/" && !joinId && !authError) || aboutPage;
+  const onLandingPath = ((location.pathname === "/" && !joinId && !authError) || aboutPage) && !isNativeApp;
   if (onLandingPath && !authResolved) return null;
   if (onLandingPath && (!user || aboutPage)) {
     return (
@@ -514,14 +520,14 @@ export default function App() {
   return (
     <div className="page">
       <header className="top">
-        <Link to={user ? "/about" : "/"} className="eyebrow brand-link">Trip Planner</Link>
+        <Link to={user ? LANDING_HOME : "/"} className="eyebrow brand-link">Trip Planner</Link>
         <div className="top-row">
           <div>
-            <h1><Link to={user ? "/about" : "/"} className="brand-link">여행 플래너</Link></h1>
+            <h1><Link to={user ? LANDING_HOME : "/"} className="brand-link">여행 플래너</Link></h1>
             <div className="subline">여러 여행을 관리하고, 다녀온 여행엔 후기와 사진을 남겨보세요.</div>
           </div>
           <div className="btn-row" style={{ alignItems: "center", ...(!user && (loginPage || legalPage) ? { alignSelf: "flex-end" } : null) }}>
-            {!user && loginPage && (
+            {!user && loginPage && !isNativeApp && (
               // Back to wherever they came from inside the site (usually the
               // landing page); a direct visit to /login has nothing to go back
               // to, so fall back to the landing page.
@@ -546,7 +552,7 @@ export default function App() {
                 {legalPage && (
                   // Terms/privacy are reached from the landing page's footer,
                   // so "back" always means the landing page (/about when signed in).
-                  <Link className="back-link" style={{ marginBottom: 0, fontSize: 16.5 }} to={user ? "/about" : "/"}>
+                  <Link className="back-link" style={{ marginBottom: 0, fontSize: 16.5 }} to={user ? LANDING_HOME : "/"}>
                     ← 뒤로가기
                   </Link>
                 )}

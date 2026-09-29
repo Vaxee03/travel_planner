@@ -1,0 +1,16 @@
+{
+  "appId": "kr.tripplanner.app",
+  "appName": "여행 플래너",
+  "webDir": "dist-native",
+  "android": {
+    "backgroundColor": "#16181d"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "launchShowDuration": 600,
+      "backgroundColor": "#16181d",
+      "showSpinner": false
+    }
+  }
+}

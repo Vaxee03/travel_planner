@@ -1,4 +1,5 @@
 import { fmtMoney, truncateCanvasText } from "./utils";
+import { PUBLIC_ORIGIN } from "./platform";
 
 const W = 720;
 const H = 460;
@@ -11,7 +12,7 @@ const sp = (n) => Math.round(n * TS);
 const FONT = '"Jua", "Noto Sans KR", sans-serif';
 
 export function inviteJoinUrl(tripId) {
-  return `${window.location.origin}/join/${tripId}`;
+  return `${PUBLIC_ORIGIN}/join/${tripId}`;
 }
 
 function roundedClip(ctx, x, y, w, h, r) {

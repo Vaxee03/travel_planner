@@ -13,6 +13,7 @@ import LocationViewer from "./LocationViewer";
 import RouteMapViewer from "./RouteMapViewer";
 import { reportError } from "../lib/errorReporting";
 import { shareLink, shareButtonLabel } from "../lib/share";
+import { PUBLIC_ORIGIN } from "../lib/platform";
 import { useNicknames } from "../lib/useNicknames";
 import { DEFAULT_NICKNAME, NICKNAME_MAX } from "../lib/users";
 import { PERMISSION_CATEGORIES } from "../lib/permissions";
@@ -235,7 +236,7 @@ function ShareLinkForm({ trip, onSubmit, onClose }) {
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const url = trip.publicShareId ? `${window.location.origin}/share/${trip.publicShareId}` : "";
+  const url = trip.publicShareId ? `${PUBLIC_ORIGIN}/share/${trip.publicShareId}` : "";
 
   async function toggle(action) {
     setBusy(true);

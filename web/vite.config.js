@@ -3,7 +3,11 @@ import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
-export default defineConfig({
+// `vite build --mode native` builds the Android/iOS app bundle (Capacitor,
+// see capacitor.config.json) into dist-native: same app, without the PWA
+// service worker — the app already ships its files and updates via the store.
+export default defineConfig(({ mode }) => ({
+  build: mode === 'native' ? { outDir: 'dist-native' } : undefined,
   // Identifies which deploy a reported client error came from.
   define: {
     __APP_RELEASE__: JSON.stringify(new Date().toISOString().slice(0, 16)),
@@ -11,6 +15,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      disable: mode === 'native',
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
@@ -36,4 +41,4 @@ export default defineConfig({
       },
     }),
   ],
-})
+}))

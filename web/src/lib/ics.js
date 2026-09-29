@@ -1,3 +1,5 @@
+import { saveFile } from "./files";
+
 function pad(n) {
   return String(n).padStart(2, "0");
 }
@@ -82,12 +84,5 @@ export function buildTripIcs(trip) {
 export function downloadTripIcs(trip) {
   const ics = buildTripIcs(trip);
   const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${trip.title || "여행"}.ics`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  return saveFile(`${trip.title || "여행"}.ics`, blob);
 }

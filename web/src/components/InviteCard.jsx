@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { drawInviteCard, canvasToBlob, inviteJoinUrl } from "../lib/inviteCard";
-import { saveBlobAsFile } from "../lib/utils";
+import { saveFile } from "../lib/files";
 import { shareLink, shareButtonLabel } from "../lib/share";
 
 function CopyField({ label, value, copyKey, onCopy, inputRef, mono }) {
@@ -57,7 +57,7 @@ export default function InviteCard({ trip, onClose }) {
 
   async function handleDownload() {
     const blob = await canvasToBlob(canvasRef.current);
-    saveBlobAsFile(`${trip.title} 초대장.png`, blob);
+    await saveFile(`${trip.title} 초대장.png`, blob);
   }
 
   async function copyText(text, inputRef, setCopyKey) {

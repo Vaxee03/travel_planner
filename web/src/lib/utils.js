@@ -206,17 +206,6 @@ export function truncateCanvasText(ctx, text, maxWidth) {
   return t + "…";
 }
 
-export function saveBlobAsFile(filename, dataOrBlob) {
-  const blob = dataOrBlob instanceof Blob ? dataOrBlob : new Blob([dataOrBlob], { type: "text/plain" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
 /** Review posts live in trip.reviewsBy[authorId] — one entry per member,
  * which the security rules let only that member change. Trips from before
  * that still have the old shared trip.reviews array; those posts keep

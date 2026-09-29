@@ -1,8 +1,20 @@
+import { isNativeApp } from "./platform";
+
 /** Shares a link through the device's own share sheet (on phones that's
  * where KakaoTalk, Messages etc. show up) and falls back to copying the link
  * where the Web Share API isn't available (most desktop browsers).
  * Resolves "shared" | "copied" | "cancelled" | "failed". */
 export async function shareLink({ title, text, url }) {
+  if (isNativeApp) {
+    // The Android WebView has no Web Share API; the app's own share sheet.
+    try {
+      const { Share } = await import("@capacitor/share");
+      await Share.share({ title, text, url, dialogTitle: title });
+      return "shared";
+    } catch (err) {
+      if (/cancel/i.test(String(err?.message))) return "cancelled";
+    }
+  }
   if (navigator.share) {
     try {
       await navigator.share({ title, text, url });
@@ -36,4 +48,4 @@ function legacyCopy(text) {
 }
 
 /** The label the share button should show on this device. */
-export const shareButtonLabel = () => (typeof navigator !== "undefined" && navigator.share ? "📤 공유하기" : "🔗 링크 복사");
+export const shareButtonLabel = () => (isNativeApp || (typeof navigator !== "undefined" && navigator.share) ? "📤 공유하기" : "🔗 링크 복사");
