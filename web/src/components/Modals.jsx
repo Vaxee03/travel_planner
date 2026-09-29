@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useJsApiLoader } from "@react-google-maps/api";
+import { reportFormProblem } from "../lib/formProblem";
 import { fmtDate, itemKind, FormError, datesInRange } from "../lib/utils";
 import { MAPS_LOADER_OPTIONS } from "../lib/mapsLoader";
 import { fetchCitySuggestions, findPlaceLocation, INTERNATIONAL_REGION_CODES } from "../lib/placeSearch";
@@ -294,9 +295,9 @@ function formValues(form) {
   return Object.fromEntries(fd.entries());
 }
 
-/** A form's own required/min/type constraints are checked silently via
- * checkValidity() and reported through this box instead of the browser's
- * native validation bubble, so every "필수 항목" error looks the same. */
+/** A form's own required/min/type constraints are checked silently (see
+ * lib/formProblem.js) and reported through this box, naming the field and
+ * what's wrong, instead of the browser's native validation bubble. */
 function FormNote({ message }) {
   if (!message) return null;
   return (
@@ -351,8 +352,9 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit: 
 
   function handleSubmit(e) {
     e.preventDefault();
-    if (!e.target.checkValidity()) {
-      setFormError("모든 필수 항목을 입력해주세요.");
+    const problem = reportFormProblem(e.target);
+    if (problem) {
+      setFormError(problem);
       return;
     }
     setFormError(null);
@@ -562,9 +564,10 @@ function TripForm({ isEdit, t, trips, onSubmit, onClose, saveError }) {
       setError("인원 수는 1명 이상이어야 해요.");
       return;
     }
-    if (!e.target.checkValidity()) {
+    const problem = reportFormProblem(e.target);
+    if (problem) {
       e.preventDefault();
-      setError("모든 필수 항목을 입력해주세요.");
+      setError(problem);
       return;
     }
     setError(null);
@@ -935,9 +938,10 @@ function ItemForm({ isEdit, it, prefilled, title, notice, dayOptions, destinatio
   const [error, setError] = useState(null);
 
   function handleSubmit(e) {
-    if (!e.target.checkValidity()) {
+    const problem = reportFormProblem(e.target);
+    if (problem) {
       e.preventDefault();
-      setError("모든 필수 항목을 입력해주세요.");
+      setError(problem);
       return;
     }
     setError(null);

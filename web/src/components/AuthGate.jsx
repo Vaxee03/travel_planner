@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { reportFormProblem } from "../lib/formProblem";
 import {
   signIn, signUp, signInWithGoogle, signInWithKakao, setRememberMe, sendPasswordReset, authErrorMessage,
 } from "../lib/firebase";
@@ -71,8 +72,9 @@ export default function AuthGate({ onAuthed }) {
 
   function handleSubmit(e) {
     e.preventDefault();
-    if (!e.target.checkValidity()) {
-      setError("모든 필수 항목을 입력해주세요.");
+    const problem = reportFormProblem(e.target);
+    if (problem) {
+      setError(problem);
       return;
     }
     const fd = new FormData(e.target);
