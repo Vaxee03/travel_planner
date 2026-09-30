@@ -59,17 +59,21 @@ export { app, auth };
 let functionsModule;
 function loadFunctions() {
   functionsModule ||= import("firebase/functions").then((m) => {
-    const instance = m.getFunctions(app, "us-central1");
-    if (useEmulators) m.connectFunctionsEmulator(instance, "127.0.0.1", 5001);
-    return { instance, httpsCallable: m.httpsCallable };
+    const region = (r) => {
+      const instance = m.getFunctions(app, r);
+      if (useEmulators) m.connectFunctionsEmulator(instance, "127.0.0.1", 5001);
+      return instance;
+    };
+    return { instances: { "us-central1": region("us-central1"), "asia-northeast3": region("asia-northeast3") }, httpsCallable: m.httpsCallable };
   });
   return functionsModule;
 }
 
-/** Calls a callable Cloud Function; resolves its `data`. */
-export async function callFunction(name, data) {
-  const { instance, httpsCallable } = await loadFunctions();
-  const res = await httpsCallable(instance, name)(data);
+/** Calls a callable Cloud Function; resolves its `data`. Most functions run
+ * in us-central1; pass `region` for the ones that don't. */
+export async function callFunction(name, data, { region = "us-central1" } = {}) {
+  const { instances, httpsCallable } = await loadFunctions();
+  const res = await httpsCallable(instances[region], name)(data);
   return res.data;
 }
 
@@ -144,9 +148,17 @@ async function nativeGoogleSignIn() {
 // this attempt's random `state` (see kakaoCallback in functions/index.js)
 // signs in as the same oidc.kakao account the website uses.
 const KAKAO_REST_KEY = "ff139dec181f0ffcdd2d64bad5987cba";
-const KAKAO_REDIRECT_URI = "https://tripplanner.kr/auth/kakao/callback";
+// The function's own address, not tripplanner.kr/...: a browser that has
+// visited the website has its service worker, which would answer that path
+// with the web app itself instead of letting the request reach the function.
+const KAKAO_REGION = "asia-northeast3"; // Seoul — see kakaoCallback in functions/index.js
+const KAKAO_REDIRECT_URI = `https://${KAKAO_REGION}-travel-planner-bb32d.cloudfunctions.net/kakaoCallback`;
 
 async function nativeKakaoSignIn() {
+  // Wake both server functions now, while the user is on Kakao's login
+  // page, so neither has to start up on the way back into the app.
+  fetch(`${KAKAO_REDIRECT_URI}?warm=1`, { mode: "no-cors" }).catch(() => {});
+  callFunction("claimKakaoLogin", { warm: true }, { region: KAKAO_REGION }).catch(() => {});
   const [{ App }, { Browser }] = await Promise.all([import("@capacitor/app"), import("@capacitor/browser")]);
   const state = [...crypto.getRandomValues(new Uint8Array(20))].map((b) => b.toString(16).padStart(2, "0")).join("");
   const url = "https://kauth.kakao.com/oauth/authorize?" + new URLSearchParams({
@@ -171,7 +183,7 @@ async function nativeKakaoSignIn() {
   if (result === "cancelled") throw cancelled();
   let idToken;
   try {
-    ({ idToken } = await callFunction("claimKakaoLogin", { state }));
+    ({ idToken } = await callFunction("claimKakaoLogin", { state }, { region: KAKAO_REGION }));
   } catch (err) {
     if (result === "closed") throw cancelled();
     throw Object.assign(new Error("kakao sign-in failed"), { code: "auth/internal-error", cause: err });

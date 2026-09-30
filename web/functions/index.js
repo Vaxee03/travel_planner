@@ -3,7 +3,6 @@ const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
 const { getStorage } = require("firebase-admin/storage");
-const { GoogleGenAI } = require("@google/genai");
 
 initializeApp();
 
@@ -280,6 +279,9 @@ exports.recommendRestaurants = onCall({ secrets: ["GEMINI_API_KEY"], region: "us
 
   await consumeDailyAiQuota(request.auth.uid);
 
+  // Required here, not at the top: every function shares this file, and
+  // loading the AI SDK slowed every cold start (sign-in included).
+  const { GoogleGenAI } = require("@google/genai");
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
   const prompt = `당신은 여행 맛집 추천 전문가입니다. "${destination}"을(를) 여행하는 사람에게 현지 맛집 5곳을 추천해주세요.
@@ -322,23 +324,32 @@ ${preferences ? `사용자가 원하는 조건: "${preferences}". 이 조건에 
 // and comes back in a different browser tab, which loses the flow's state.
 // So the app runs a plain OAuth code flow instead:
 //   1. the app opens Kakao's login page in the browser with a random `state`
-//   2. Kakao redirects here (/auth/kakao/callback, a hosting rewrite) with a
+//   2. Kakao redirects here (KAKAO_REDIRECT_URI) with a
 //      code, which is swapped for tokens — including Kakao's OIDC id_token
 //   3. the id_token is parked under that `state` for a few minutes and the
 //      browser is sent back into the app (kr.tripplanner.app://auth/kakao)
 //   4. the app claims it once (claimKakaoLogin) and signs in to Firebase with
 //      it as an oidc.kakao credential — the same account as on the website.
 // Uses the REST API key the Firebase oidc.kakao provider is configured with,
-// so the id_token's audience matches what Firebase checks.
+// so the id_token's audience matches what Firebase checks. These two run in
+// Seoul, next to the Firestore database and Kakao's servers — in us-central1
+// every step crossed the Pacific and sign-in took seconds longer.
 const { defineSecret } = require("firebase-functions/params");
 const KAKAO_CLIENT_SECRET = defineSecret("KAKAO_CLIENT_SECRET");
 const KAKAO_REST_KEY = "ff139dec181f0ffcdd2d64bad5987cba";
-const KAKAO_REDIRECT_URI = "https://tripplanner.kr/auth/kakao/callback";
+// The function's own address, not tripplanner.kr/...: a browser that has
+// visited the website has its service worker, which would answer that path
+// with the web app itself instead of letting the request reach the function.
+const KAKAO_REGION = "asia-northeast3";
+const KAKAO_REDIRECT_URI = "https://asia-northeast3-travel-planner-bb32d.cloudfunctions.net/kakaoCallback";
 const APP_RETURN_URL = "kr.tripplanner.app://auth/kakao";
 const HANDOFF_TTL_MS = 5 * 60 * 1000;
 const handoffs = () => db.collection("kakaoLoginHandoff"); // server-only (no rules match)
 
-exports.kakaoCallback = onRequest({ region: "us-central1", secrets: [KAKAO_CLIENT_SECRET] }, async (req, res) => {
+exports.kakaoCallback = onRequest({ region: KAKAO_REGION, secrets: [KAKAO_CLIENT_SECRET] }, async (req, res) => {
+  // The app pings this when the user taps the Kakao button, so an instance
+  // is already up by the time Kakao redirects here.
+  if (req.query.warm) return res.status(204).end();
   const state = String(req.query.state || "");
   const code = String(req.query.code || "");
   const back = (result) => res.redirect(302, `${APP_RETURN_URL}?result=${result}`);
@@ -351,7 +362,7 @@ exports.kakaoCallback = onRequest({ region: "us-central1", secrets: [KAKAO_CLIEN
       body: new URLSearchParams({
         grant_type: "authorization_code",
         client_id: KAKAO_REST_KEY,
-        client_secret: KAKAO_CLIENT_SECRET.value(),
+        client_secret: KAKAO_CLIENT_SECRET.value().trim(),
         redirect_uri: KAKAO_REDIRECT_URI,
         code,
       }),
@@ -362,9 +373,6 @@ exports.kakaoCallback = onRequest({ region: "us-central1", secrets: [KAKAO_CLIEN
       return back("failed");
     }
     await handoffs().doc(state).set({ idToken: tokens.id_token, createdAt: Date.now() });
-    // Drop handoffs nobody came back for.
-    const stale = await handoffs().where("createdAt", "<", Date.now() - HANDOFF_TTL_MS).limit(50).get();
-    await Promise.all(stale.docs.map((d) => d.ref.delete()));
     return back("ok");
   } catch (err) {
     console.error("kakao callback error", err);
@@ -372,10 +380,16 @@ exports.kakaoCallback = onRequest({ region: "us-central1", secrets: [KAKAO_CLIEN
   }
 });
 
-exports.claimKakaoLogin = onCall({ region: "us-central1" }, async (request) => {
+exports.claimKakaoLogin = onCall({ region: KAKAO_REGION }, async (request) => {
+  if (request.data?.warm) return { ok: true }; // see kakaoCallback
   const state = String(request.data?.state || "");
   if (!/^[0-9a-f]{40}$/.test(state)) throw new HttpsError("invalid-argument", "잘못된 요청이에요.");
   const ref = handoffs().doc(state);
+  // Alongside the claim (not on the redirect path): drop handoffs nobody
+  // came back for.
+  const cleanup = handoffs().where("createdAt", "<", Date.now() - HANDOFF_TTL_MS).limit(50).get()
+    .then((stale) => Promise.all(stale.docs.map((d) => d.ref.delete())))
+    .catch((err) => console.error("handoff cleanup failed", err));
   const idToken = await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists) return null;
@@ -383,6 +397,7 @@ exports.claimKakaoLogin = onCall({ region: "us-central1" }, async (request) => {
     const { idToken, createdAt } = snap.data();
     return Date.now() - createdAt <= HANDOFF_TTL_MS ? idToken : null;
   });
+  await cleanup;
   if (!idToken) throw new HttpsError("not-found", "로그인 정보가 없거나 만료됐어요. 다시 시도해주세요.");
   return { idToken };
 });

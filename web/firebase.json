@@ -29,13 +29,6 @@
         }
       },
       {
-        "source": "/auth/kakao/callback",
-        "function": {
-          "functionId": "kakaoCallback",
-          "region": "us-central1"
-        }
-      },
-      {
         "source": "**",
         "destination": "/index.html"
       }
