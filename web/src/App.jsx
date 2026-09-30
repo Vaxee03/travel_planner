@@ -45,6 +45,7 @@ const ModalHost = lazy(loadModals);
 const PublicTripView = lazy(() => import("./components/PublicTripView"));
 const TermsPage = lazy(() => import("./components/LegalPage").then((m) => ({ default: m.TermsPage })));
 const PrivacyPage = lazy(() => import("./components/LegalPage").then((m) => ({ default: m.PrivacyPage })));
+const AccountDeletionPage = lazy(() => import("./components/LegalPage").then((m) => ({ default: m.AccountDeletionPage })));
 // The landing page is what signed-out visitors see at "/"; start fetching it
 // right away there so it isn't waiting on the auth check to begin loading.
 const loadLanding = () => import("./components/Landing");
@@ -120,7 +121,7 @@ export default function App() {
   }, [user]);
 
   // Any other path (typo, old bookmark) just falls back to the trip list.
-  const legalPage = location.pathname === "/terms" ? "terms" : location.pathname === "/privacy" ? "privacy" : null;
+  const legalPage = { "/terms": "terms", "/privacy": "privacy", "/account-deletion": "account-deletion" }[location.pathname] || null;
   const loginPage = location.pathname === "/login";
   const aboutPage = location.pathname === "/about" && !isNativeApp;
   const knownPath = Boolean(location.pathname === "/" || loginPage || aboutPage || tripMatch || joinMatch || shareMatch || legalPage);
@@ -640,6 +641,8 @@ export default function App() {
         <TermsPage />
       ) : legalPage === "privacy" ? (
         <PrivacyPage />
+      ) : legalPage === "account-deletion" ? (
+        <AccountDeletionPage />
       ) : shareMatch ? (
         <PublicTripView shareId={shareMatch.params.shareId} />
       ) : authError ? (

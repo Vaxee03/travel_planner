@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+<!-- App icon artwork (paper plane + looping dashed route) on a transparent
+     108dp adaptive-icon canvas: launchers show only the inner 66.7% circle
+     (viewBox 171 171 682 682), so everything stays inside it. Background is
+     the brand coral #e07a63. Regenerate every icon with: npm run icons -->
+<g transform="translate(512 530) scale(0.84) translate(-512 -512)"><path d="M268 712 C 252 650, 262 566, 328 522 C 356 503, 424 506, 438 562 C 450 612, 402 634, 370 620 C 330 603, 322 560, 352 536 C 392 504, 470 478, 530 456" fill="none" stroke="#ffffff" stroke-linecap="butt" stroke-linejoin="round" stroke-width="20" stroke-dasharray="40 28"/><g transform="translate(650 402) rotate(-24) translate(-244.28571428571428 -195.12605042016807) scale(0.7563025210084033)"><g stroke="#b68c82" stroke-width="18" stroke-linejoin="round">
+<path d="M100 59 546 280 169 206z" fill="#fff6f2"/><path d="M169 206 546 280 190 273 101 335z" fill="#ccc5c2"/>
+<path d="M190 273 216 347 101 335z" fill="#948f8c"/><path d="M190 273 546 280 260 456 216 347z" fill="#fff7f4"/></g></g></g>
+</svg>

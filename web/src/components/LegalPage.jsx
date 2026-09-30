@@ -1,6 +1,7 @@
 // ⚠️ Written as a starting point, not legal advice — have it reviewed
 // before a store launch.
 const OPERATOR = "초보개발자";
+const OPERATOR_EN = "basicdeveloper";
 const CONTACT_EMAIL = "tripptriplanner@naver.com";
 const CONTACT = <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>;
 const EFFECTIVE_DATE = "2026년 10월 1일";
@@ -19,7 +20,7 @@ export function TermsPage() {
   return (
     <Page title="이용약관">
       <h2>제1조 (목적)</h2>
-      <p>이 약관은 {OPERATOR}(이하 "운영자")가 제공하는 여행 플래너 서비스(이하 "서비스")의 이용 조건과 절차, 운영자와 이용자의 권리·의무를 정합니다.</p>
+      <p>이 약관은 {OPERATOR}(영문: {OPERATOR_EN}, 이하 "운영자")가 제공하는 여행 플래너 서비스(이하 "서비스")의 이용 조건과 절차, 운영자와 이용자의 권리·의무를 정합니다.</p>
 
       <h2>제2조 (서비스 내용)</h2>
       <p>서비스는 여행 일정·예산·체크리스트·예약 정보·후기를 기록하고, 초대한 동행자와 함께 편집·공유하는 기능을 제공합니다. 운영자는 서비스 개선을 위해 기능을 추가·변경·중단할 수 있으며, 중요한 변경은 서비스 내에 미리 알립니다.</p>
@@ -51,7 +52,7 @@ export function TermsPage() {
 export function PrivacyPage() {
   return (
     <Page title="개인정보처리방침">
-      <p>{OPERATOR}(이하 "운영자")는 「개인정보 보호법」에 따라 이용자의 개인정보를 보호하고, 관련 고충을 원활하게 처리하기 위해 다음과 같이 개인정보처리방침을 둡니다.</p>
+      <p>{OPERATOR}(영문: {OPERATOR_EN}, 이하 "운영자")는 「개인정보 보호법」에 따라 이용자의 개인정보를 보호하고, 관련 고충을 원활하게 처리하기 위해 다음과 같이 개인정보처리방침을 둡니다.</p>
 
       <h2>1. 수집하는 개인정보</h2>
       <ul>
@@ -83,10 +84,37 @@ export function PrivacyPage() {
       <p>이용자는 언제든 자신의 정보를 조회·수정할 수 있고, 서비스 하단 "회원 탈퇴"로 계정과 개인정보 삭제를 요청할 수 있습니다. 그 밖의 열람·정정·삭제·처리정지 요청은 아래 연락처로 할 수 있습니다.</p>
 
       <h2>7. 개인정보 보호책임자</h2>
-      <p>책임자: {OPERATOR} · 연락처: {CONTACT}</p>
+      <p>책임자: {OPERATOR}({OPERATOR_EN}) · 연락처: {CONTACT}</p>
 
       <h2>8. 변경 고지</h2>
       <p>이 방침이 바뀌면 시행 7일 전(중요한 변경은 30일 전)부터 서비스 내에 알립니다.</p>
+    </Page>
+  );
+}
+
+// The public "how to delete your account" page Google Play requires for apps
+// with sign-up (linked from the store's data-safety section).
+export function AccountDeletionPage() {
+  return (
+    <Page title="계정 및 데이터 삭제 안내">
+      <p>여행 플래너(개발자: {OPERATOR}, {OPERATOR_EN}) 계정과 관련 데이터를 삭제하는 방법입니다.</p>
+      <h2>1. 앱이나 웹사이트에서 직접 삭제</h2>
+      <ol>
+        <li>여행 플래너 앱 또는 <a href="https://tripplanner.kr">tripplanner.kr</a>에 로그인합니다.</li>
+        <li>내 여행 목록 화면 맨 아래의 <b>회원 탈퇴</b>를 누릅니다.</li>
+        <li>확인 칸에 <b>탈퇴</b>를 입력하고 탈퇴를 누르면 즉시 처리됩니다.</li>
+      </ol>
+      <h2>2. 로그인할 수 없는 경우</h2>
+      <p>가입한 이메일 주소(또는 로그인에 쓴 구글·카카오 계정)를 적어 {CONTACT}로 삭제를 요청해주세요. 본인 확인 후 7일 이내에 처리하고 결과를 알려드립니다.</p>
+      <h2>3. 삭제되는 데이터</h2>
+      <ul>
+        <li>계정 정보(이메일, 로그인 연결 정보)와 닉네임</li>
+        <li>혼자 쓰던 여행 전체(일정, 예산, 준비물, 예약 정보, 후기, 사진)</li>
+        <li>동행자와 함께 쓰던 여행에 내가 올린 후기와 사진</li>
+        <li>알림 설정과 이 계정에 등록된 휴대폰 알림 정보</li>
+      </ul>
+      <h2>4. 남는 데이터</h2>
+      <p>동행자와 함께 작성한 여행 기록(일정, 지출 내역 등)은 남은 동행자의 기록으로 유지되며, 탈퇴한 사람은 멤버 목록에서 빠집니다. 별도로 보관하는 데이터는 없습니다.</p>
     </Page>
   );
 }

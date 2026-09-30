@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "kr.tripplanner.app",
+      "sha256_cert_fingerprints": [
+        "3E:69:78:63:18:B0:68:AE:76:63:D5:65:C7:BC:20:81:2C:C3:44:DE:6B:88:4B:30:C7:23:E9:E8:90:74:75:60"
+      ]
+    }
+  }
+]
