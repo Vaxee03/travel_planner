@@ -125,7 +125,7 @@ exports.ogPage = onRequest({ region: "us-central1" }, async (req, res) => {
     if (meta) {
       // A function, not a string: a replacement string would treat "$'", "$&" etc.
       // in a trip's title as patterns and splice other parts of the page in.
-      const block = previewBlock({ ...meta, url: origin + req.path, image: `${origin}/og.jpg` });
+      const block = previewBlock({ ...meta, url: origin + req.path, image: `${origin}/og.jpg?v=2` });
       html = html.replace(/<!--og:start-->[\s\S]*?<!--og:end-->/, () => block);
     }
   } catch (err) {

@@ -12,7 +12,8 @@
     "qa": "node e2e/run-all.mjs",
     "build:native": "vite build --mode native && npm run cap -- sync android",
     "cap": "npx -y -p node@22 node node_modules/@capacitor/cli/bin/capacitor",
-    "icons": "node scripts/make-icons.mjs"
+    "icons": "node scripts/make-icons.mjs",
+    "og": "node scripts/make-og.mjs"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.5.2",
