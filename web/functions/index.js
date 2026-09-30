@@ -234,7 +234,8 @@ exports.deleteAccount = onCall({ region: "us-central1" }, async (request) => {
     await snap.ref.update(update);
   }
 
-  await db.doc(`users/${uid}`).delete();
+  // The nickname doc plus its subcollections (push devices, settings).
+  await db.recursiveDelete(db.doc(`users/${uid}`));
   await getAuth().deleteUser(uid);
   return { deletedTrips };
 });
@@ -403,4 +404,127 @@ exports.claimKakaoLogin = onCall({ region: KAKAO_REGION }, async (request) => {
   await cleanup;
   if (!idToken) throw new HttpsError("not-found", "로그인 정보가 없거나 만료됐어요. 다시 시도해주세요.");
   return { idToken };
+});
+
+// ---- Push notifications ------------------------------------------------------
+// Tokens: users/{uid}/devices/{token}; switches: users/{uid}/private/prefs
+// (both written by the app, see src/lib/push.js). Runs in Seoul, next to the
+// database. Firestore triggers never delivered in this project (see
+// project notes), so the client calls notifyTripChange after its own saves.
+const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { getMessaging } = require("firebase-admin/messaging");
+const PUSH_REGION = "asia-northeast3";
+const PUSH_CHANNEL_ID = "trip_updates";
+
+const CHANGE_TEXT = {
+  itinerary: { tab: "itinerary", body: (n) => `${n}님이 일정을 수정했어요` },
+  budget: { tab: "budget", body: (n) => `${n}님이 지출 내역을 수정했어요` },
+  checklist: { tab: "checklist", body: (n) => `${n}님이 준비물 목록을 수정했어요` },
+  bookings: { tab: "bookings", body: (n) => `${n}님이 예약 정보를 수정했어요` },
+  trip: { tab: "itinerary", body: (n) => `${n}님이 여행 정보를 바꿨어요` },
+  review: { tab: "review", body: (n) => `${n}님이 후기를 남겼어요` },
+  member: { tab: "itinerary", body: (n) => `${n}님이 여행에 참여했어요` },
+};
+// One notification per person, trip and kind of change per window: editing
+// five itinerary items in a row shouldn't buzz everyone's phone five times.
+const CHANGE_THROTTLE_MS = 10 * 60 * 1000;
+
+async function tokensFor(uids, prefKey) {
+  const out = [];
+  await Promise.all(uids.map(async (uid) => {
+    const prefs = await db.doc(`users/${uid}/private/prefs`).get();
+    if (prefs.exists && prefs.data()[prefKey] === false) return;
+    const devices = await db.collection(`users/${uid}/devices`).get();
+    devices.forEach((d) => out.push({ uid, token: d.id }));
+  }));
+  return out;
+}
+
+async function sendPush(targets, { title, body, path }) {
+  if (!targets.length) return 0;
+  const res = await getMessaging().sendEachForMulticast({
+    tokens: targets.map((t) => t.token),
+    notification: { title, body },
+    data: { path },
+    android: { notification: { channelId: PUSH_CHANNEL_ID, icon: "ic_stat_notify", color: "#e2624a" } },
+  });
+  // Uninstalled apps / expired tokens: forget them.
+  await Promise.all(res.responses.map((r, i) => {
+    const code = r.error?.code || "";
+    if (code.includes("registration-token-not-registered") || code.includes("invalid-registration-token") || code.includes("invalid-argument")) {
+      return db.doc(`users/${targets[i].uid}/devices/${targets[i].token}`).delete().catch(() => {});
+    }
+    return null;
+  }));
+  return res.successCount;
+}
+
+exports.notifyTripChange = onCall({ region: PUSH_REGION }, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "로그인이 필요해요.");
+  const tripId = String(request.data?.tripId || "");
+  const kind = String(request.data?.kind || "");
+  const text = CHANGE_TEXT[kind];
+  if (!/^[A-Za-z0-9]{10,40}$/.test(tripId) || !text) throw new HttpsError("invalid-argument", "잘못된 요청이에요.");
+
+  const snap = await db.doc(`trips/${tripId}`).get();
+  const trip = snap.exists ? snap.data() : null;
+  if (!trip || !(trip.memberIds || []).includes(uid)) throw new HttpsError("permission-denied", "이 여행의 멤버가 아니에요.");
+  const others = (trip.memberIds || []).filter((id) => id !== uid);
+  if (!others.length) return { sent: 0 };
+
+  // Claim this window atomically so two quick saves don't both send.
+  const gate = db.doc(`pushThrottle/${tripId}_${uid}_${kind}`); // server-only (no rules match)
+  const open = await db.runTransaction(async (tx) => {
+    const g = await tx.get(gate);
+    if (g.exists && Date.now() - g.data().at < CHANGE_THROTTLE_MS) return false;
+    tx.set(gate, { at: Date.now() });
+    return true;
+  });
+  if (!open) return { sent: 0, throttled: true };
+
+  const me = await db.doc(`users/${uid}`).get();
+  const nickname = (me.exists && me.data().nickname) || "동행자";
+  const sent = await sendPush(await tokensFor(others, "tripChanges"), {
+    title: trip.title || "여행",
+    body: text.body(nickname),
+    path: `/trip/${tripId}/${text.tab}`,
+  });
+  return { sent };
+});
+
+// "테스트 알림 보내기" in the app's 알림 설정: only to the caller's own
+// phones, at most once a minute.
+exports.sendTestPush = onCall({ region: PUSH_REGION }, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "로그인이 필요해요.");
+  const gate = db.doc(`pushThrottle/test_${uid}`);
+  const open = await db.runTransaction(async (tx) => {
+    const g = await tx.get(gate);
+    if (g.exists && Date.now() - g.data().at < 60 * 1000) return false;
+    tx.set(gate, { at: Date.now() });
+    return true;
+  });
+  if (!open) throw new HttpsError("resource-exhausted", "잠시 후 다시 시도해주세요.");
+  const devices = await db.collection(`users/${uid}/devices`).get();
+  const sent = await sendPush(devices.docs.map((d) => ({ uid, token: d.id })), {
+    title: "여행 플래너", body: "알림이 잘 도착했어요! 🎉", path: "/",
+  });
+  return { sent };
+});
+
+// Every morning at 9 (KST): trips starting tomorrow.
+exports.tripReminders = onSchedule({ schedule: "0 9 * * *", timeZone: "Asia/Seoul", region: PUSH_REGION }, async () => {
+  const tomorrow = new Date(Date.now() + 9 * 3600 * 1000 + 24 * 3600 * 1000).toISOString().slice(0, 10);
+  const trips = await db.collection("trips").where("startDate", "==", tomorrow).get();
+  let sent = 0;
+  for (const snap of trips.docs) {
+    const trip = snap.data();
+    sent += await sendPush(await tokensFor(trip.memberIds || [], "reminders"), {
+      title: trip.title || "여행",
+      body: `내일 ${trip.destination ? `${trip.destination}(으)로 ` : ""}출발이에요! 준비물을 마지막으로 확인해보세요.`,
+      path: `/trip/${snap.id}/checklist`,
+    });
+  }
+  console.log(`tripReminders: ${trips.size} trips starting ${tomorrow}, ${sent} notifications sent`);
 });

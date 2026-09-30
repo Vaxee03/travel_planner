@@ -101,6 +101,20 @@ service cloud.firestore {
       allow write: if request.auth != null && request.auth.uid == uid &&
         (!('nickname' in request.resource.data) ||
           (request.resource.data.nickname is string && request.resource.data.nickname.size() <= 20));
+
+      // This user's phones (push tokens) and notification settings — private
+      // to them; the push functions read them with admin access.
+      match /devices/{token} {
+        allow read, delete: if request.auth != null && request.auth.uid == uid;
+        allow create, update: if request.auth != null && request.auth.uid == uid &&
+          request.resource.data.keys().hasOnly(['platform', 'updatedAt']);
+      }
+      match /private/prefs {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow write: if request.auth != null && request.auth.uid == uid &&
+          request.resource.data.keys().hasOnly(['tripChanges', 'reminders', 'updatedAt']) &&
+          request.resource.data.tripChanges is bool && request.resource.data.reminders is bool;
+      }
     }
   }
 }

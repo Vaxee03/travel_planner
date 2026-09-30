@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { callFunction } from "../lib/firebase";
 import { createPortal } from "react-dom";
 import { useJsApiLoader } from "@react-google-maps/api";
 import { reportFormProblem } from "../lib/formProblem";
@@ -559,6 +560,31 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit: 
         )}
       </form>
     );
+  } else if (modal.type === "push-settings") {
+    const toggle = { display: "flex", alignItems: "flex-start", gap: 10, fontWeight: 400, color: "var(--ink)", marginBottom: 14 };
+    const sub = { display: "block", fontSize: 13, color: "var(--ink-soft)" };
+    content = (
+      <form onSubmit={handleSubmit}>
+        <h3>알림 설정</h3>
+        <label style={toggle}>
+          <input type="checkbox" name="tripChanges" defaultChecked={modal.prefs.tripChanges} style={{ width: "auto", marginTop: 5, flexShrink: 0 }} />
+          <span>동행자 변경 알림<span style={sub}>동행자가 일정·예산·준비물·예약을 바꾸거나 새로 참여했을 때</span></span>
+        </label>
+        <label style={toggle}>
+          <input type="checkbox" name="reminders" defaultChecked={modal.prefs.reminders} style={{ width: "auto", marginTop: 5, flexShrink: 0 }} />
+          <span>출발 전날 알림<span style={sub}>여행 출발 하루 전 아침 9시에 준비물 확인 알림</span></span>
+        </label>
+        {!modal.permitted ? (
+          <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--ink-soft)" }}>
+            휴대폰 설정에서 이 앱의 알림이 꺼져 있어요. 설정 → 애플리케이션 → 여행 플래너 → 알림에서 켜주세요.
+          </p>
+        ) : (
+          <TestPushButton />
+        )}
+        <FormNote message={formError} />
+        <Actions submitLabel="저장" onClose={onClose} />
+      </form>
+    );
   } else if (modal.type === "edit-review") {
     const myPost = reviewPosts(trip).find((r) => r.authorId === modal.uid);
     content = (
@@ -1081,6 +1107,26 @@ function ItemLocationField({ initial, destination }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** 알림 설정: sends a notification to this account's own phones. */
+function TestPushButton() {
+  const [state, setState] = useState(null); // null | "sending" | message
+  async function send() {
+    setState("sending");
+    try {
+      const { sent } = await callFunction("sendTestPush", {}, { region: "asia-northeast3" });
+      setState(sent ? "보냈어요. 잠시 후 알림이 와요." : "이 휴대폰이 아직 등록되지 않았어요. 앱을 다시 열어주세요.");
+    } catch (err) {
+      setState(err?.code === "functions/resource-exhausted" ? "1분 뒤에 다시 시도해주세요." : "보내지 못했어요. 잠시 후 다시 시도해주세요.");
+    }
+  }
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 12px", flexWrap: "wrap" }}>
+      <button type="button" className="btn btn-sm" disabled={state === "sending"} onClick={send}>테스트 알림 보내기</button>
+      {state && state !== "sending" && <span style={{ fontSize: 13, color: "var(--ink-soft)" }}>{state}</span>}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Link, matchPath, useLocation, useNavigate } from "react-router-dom";
-import { firebaseReady, watchAuth, signOutUser, deleteMyAccount } from "./lib/firebase";
+import { firebaseReady, watchAuth, signOutUser, deleteMyAccount, callFunction } from "./lib/firebase";
 import { subscribeTrips, createTrip, mutateTrip, deleteTrip, joinTrip, removeMember, setChecklistDone, setPublicShareId, fetchNickname, setNickname } from "./lib/data";
 
 const JOIN_FAILED = "여행에 참여하지 못했어요. 코드가 맞는지, 방장이 참여를 막지 않았는지 확인해주세요.";
@@ -14,6 +14,26 @@ import {
 import { computePerms, PERMISSION_CATEGORIES } from "./lib/permissions";
 import { isNativeApp } from "./lib/platform";
 import { useNativeShell } from "./lib/useNativeShell";
+import { reportError } from "./lib/errorReporting";
+// App only (Firestore-backed like lib/data, so loaded on demand).
+const loadPush = () => import("./lib/push");
+
+// Which saves tell the other members' phones (see notifyTripChange in
+// functions/index.js); anything not listed here (memo autosave, reordering,
+// checklist ticks, share links…) stays quiet.
+const NOTIFY_KIND = {
+  "add-day": "itinerary", "edit-day": "itinerary", "delete-day": "itinerary",
+  "add-item": "itinerary", "edit-item": "itinerary", "delete-item": "itinerary", "add-restaurant": "itinerary",
+  "add-budget": "budget", "edit-budget": "budget", "delete-budget": "budget",
+  "add-check": "checklist", "edit-check": "checklist", "delete-check": "checklist",
+  "add-booking": "bookings", "edit-booking": "bookings", "delete-booking": "bookings",
+  "edit-trip": "trip", "edit-review": "review",
+};
+function notifyTripChange(tripId, kind) {
+  if (!tripId || !kind) return;
+  callFunction("notifyTripChange", { tripId, kind }, { region: "asia-northeast3" })
+    .catch(() => { /* a missed notification isn't worth bothering anyone about */ });
+}
 import Home from "./components/Home";
 import AuthGate from "./components/AuthGate";
 
@@ -123,7 +143,10 @@ export default function App() {
   useEffect(() => {
     if (!user || !joinId) return;
     joinTrip(joinId, user.uid)
-      .then(() => navigate(`/trip/${joinId}/itinerary`, { replace: true }))
+      .then(() => {
+        notifyTripChange(joinId, "member");
+        navigate(`/trip/${joinId}/itinerary`, { replace: true });
+      })
       .catch(() => { setFlash(JOIN_FAILED); navigate("/", { replace: true }); });
   }, [user, joinId, navigate]);
 
@@ -171,6 +194,32 @@ export default function App() {
   function openModal(m) { setModal({ ...m, tripAtOpen: trip }); }
   function closeModal() { setModal(null); }
 
+  // In the app: register this phone for push once signed in. (navigate via
+  // a ref: its identity changes with every route, and this should run once
+  // per sign-in, not on every screen change.)
+  const navigateRef = useRef(navigate);
+  navigateRef.current = navigate;
+  const pushUid = user?.uid;
+  useEffect(() => {
+    if (!isNativeApp || !pushUid) return;
+    loadPush()
+      .then((p) => p.startPush(pushUid, (path) => navigateRef.current(path)))
+      .catch((err) => reportError(err, "push-start"));
+  }, [pushUid]);
+
+  async function openPushSettings() {
+    const { loadPushPrefs, pushPermitted } = await loadPush();
+    const [prefs, permitted] = await Promise.all([loadPushPrefs(user.uid), pushPermitted()]);
+    setModal({ type: "push-settings", prefs, permitted });
+  }
+
+  async function handleSignOut() {
+    // Stop this phone getting the account's notifications (needs the
+    // session still valid to delete its token), then sign out.
+    if (isNativeApp && user) await loadPush().then((p) => p.stopPush(user.uid)).catch(() => {});
+    signOutUser();
+  }
+
   function requestDelete(onYes, message, extra) {
     setModal({ type: "confirm", onYes, message, ...extra, tripAtOpen: trip });
   }
@@ -215,6 +264,13 @@ export default function App() {
       throw err;
     }
     return true;
+  }
+
+  // Saves, then (for the kinds above) lets the other members know.
+  async function submitAndNotify(m, values) {
+    const tid = tripId;
+    await handleModalSubmit(m, values);
+    notifyTripChange(tid, NOTIFY_KIND[m.type === "confirm" ? m.onYes : m.type]);
   }
 
   async function handleModalSubmit(m, values) {
@@ -277,6 +333,12 @@ export default function App() {
       return;
     }
 
+    if (m.type === "push-settings") {
+      const { savePushPrefs } = await loadPush();
+      await savePushPrefs(user.uid, { tripChanges: values.tripChanges === "on", reminders: values.reminders === "on" });
+      closeModal();
+      return;
+    }
     if (m.type === "set-nickname" || m.type === "edit-nickname") {
       const nick = (values.nickname || "").trim();
       if (!nick) throw new FormError("닉네임을 입력해주세요.");
@@ -546,7 +608,8 @@ export default function App() {
                   <span className="btn-row" style={{ alignItems: "center" }}>
                     <span style={{ color: "var(--nickname)", fontSize: 15, fontWeight: 700 }}>{nickname || "닉네임 없음"}</span>
                     <button className="btn btn-sm" onClick={() => setModal({ type: "edit-nickname", currentNickname: nickname })}>닉네임 수정</button>
-                    <button className="btn btn-sm" onClick={signOutUser}>로그아웃</button>
+                    {isNativeApp && <button className="btn btn-sm" onClick={openPushSettings}>알림</button>}
+                    <button className="btn btn-sm" onClick={handleSignOut}>로그아웃</button>
                   </span>
                 )}
                 {legalPage && (
@@ -625,7 +688,7 @@ export default function App() {
 
       {modal && (
         <Suspense fallback={null}>
-          <ModalHost modal={modal} trip={trip} trips={trips} uid={user?.uid} onClose={closeModal} onSubmit={handleModalSubmit} />
+          <ModalHost modal={modal} trip={trip} trips={trips} uid={user?.uid} onClose={closeModal} onSubmit={submitAndNotify} />
         </Suspense>
       )}
     </div>

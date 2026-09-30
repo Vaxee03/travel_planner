@@ -6,7 +6,7 @@ import {
   initializeTestEnvironment, assertSucceeds, assertFails,
 } from "@firebase/rules-unit-testing";
 import {
-  doc, getDoc, getDocs, setDoc, updateDoc, arrayRemove, arrayUnion, deleteField,
+  doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, arrayRemove, arrayUnion, deleteField,
   collection, query, where, documentId,
 } from "firebase/firestore";
 
@@ -123,4 +123,19 @@ test("a new trip must be yours alone", async () => {
   await assertFails(setDoc(doc(db("alice"), "trips/n4"), { ...mine, memberPermissions: { bob: ["budget"] } }));
   await assertFails(setDoc(doc(db("alice"), "trips/n5"), { ...mine, publicShareId: "0".repeat(32) }));
   await assertFails(setDoc(doc(db("alice"), "trips/n6"), { ...mine, blockedIds: ["bob"] }));
+});
+
+test("push devices and settings are private to their owner", async () => {
+  await assertSucceeds(setDoc(doc(db("alice"), "users/alice/devices/tokA"), { platform: "android", updatedAt: 1 }));
+  await assertFails(setDoc(doc(db("alice"), "users/alice/devices/tokB"), { platform: "android", updatedAt: 1, extra: 1 }));
+  await assertFails(getDoc(doc(db("bob"), "users/alice/devices/tokA")));
+  await assertFails(getDocs(collection(db("bob"), "users/alice/devices")));
+  await assertFails(setDoc(doc(db("bob"), "users/alice/devices/tokX"), { platform: "android", updatedAt: 1 }));
+  await assertFails(deleteDoc(doc(db("bob"), "users/alice/devices/tokA")));
+  await assertSucceeds(deleteDoc(doc(db("alice"), "users/alice/devices/tokA")));
+
+  await assertSucceeds(setDoc(doc(db("alice"), "users/alice/private/prefs"), { tripChanges: false, reminders: true, updatedAt: 1 }));
+  await assertFails(setDoc(doc(db("alice"), "users/alice/private/prefs"), { tripChanges: "no", reminders: true, updatedAt: 1 }));
+  await assertFails(getDoc(doc(db("bob"), "users/alice/private/prefs")));
+  await assertFails(setDoc(doc(db("alice"), "users/alice/private/other"), { a: 1 }));
 });
