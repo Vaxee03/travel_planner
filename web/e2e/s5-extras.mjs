@@ -205,16 +205,16 @@ await tc("R-02", A2, "추천 식당을 일정에 추가 (방장)",
     return `"${name}" → 둘째 날 [${it.time}] ${it.text}${it.location ? ` (위치 저장됨)` : " (위치 없음)"} / 안내: "${notice}" / 표시: "${mark}"`;
   });
 
-await tc("R-03", A2, "탭을 벗어났다 돌아오면 추천 결과 초기화",
+await tc("R-03", A2, "탭을 벗어났다 돌아와도 추천 결과 유지",
   "추천 결과가 있는 상태에서 '일정' 탭 → 다시 '맛집 추천' 탭",
-  "추천 결과가 사라지고 처음 상태",
+  "마지막 추천 결과가 그대로 보임 (이 브라우저에 여행별로 보관)",
   async () => {
     if (!recOk) return { actual: "R-01 실패로 건너뜀", status: "SKIP" };
     const tabs = async (n) => { for (const t of await po.$$(".tab")) if ((await t.evaluate((e) => e.innerText.trim())) === n) { await t.click(); break; } await wait(500); };
     await tabs("일정"); await tabs("맛집 추천");
     const cards = await po.evaluate(() => document.querySelectorAll(".food-card").length);
-    assert(cards === 0, String(cards));
-    return "초기 상태로 돌아감";
+    assert(cards > 0, String(cards));
+    return `추천 카드 ${cards}개 그대로 표시`;
   });
 
 // ---- review & photos ---------------------------------------------------------
@@ -472,7 +472,8 @@ await tc("Z-01", "공통", "부가 기능 화면 콘솔 오류",
   "위 과정 동안 브라우저 오류 수집",
   "자바스크립트 오류 없음",
   async () => {
-    const errs = [...po.__errors, ...pb.__errors].filter((e) => !/favicon|net::|ERR_|DevTools|Failed to load resource/.test(e));
+    // R-00 makes the AI call fail on purpose; the app logs that failure.
+    const errs = [...po.__errors, ...pb.__errors].filter((e) => !/favicon|net::|ERR_|DevTools|Failed to load resource|\[restaurant-recs\]/.test(e));
     return { actual: errs.length ? [...new Set(errs)].slice(0, 5).join(" | ") : "오류 0건", status: errs.length ? "WARN" : "PASS" };
   });
 

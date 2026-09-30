@@ -2,9 +2,10 @@ import { initializeApp } from "firebase/app";
 import {
   getAuth, onAuthStateChanged, connectAuthEmulator, signInWithCustomToken, signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  signOut, GoogleAuthProvider, OAuthProvider, signInWithPopup,
+  signOut, GoogleAuthProvider, OAuthProvider, signInWithPopup, signInWithCredential,
   setPersistence, browserLocalPersistence, browserSessionPersistence, sendPasswordResetEmail,
 } from "firebase/auth";
+import { isNativeApp } from "./platform";
 
 // Firebase console → Authentication → Sign-in method → Add new provider →
 // OpenID Connect. Must be created there with this exact Provider ID.
@@ -122,11 +123,69 @@ export async function deleteMyAccount() {
   await signOut(auth).catch(() => {});
 }
 
+const cancelled = () => Object.assign(new Error("sign-in cancelled"), { code: "auth/popup-closed-by-user" });
+
+// In the app, Google blocks its sign-in page inside the app's WebView, so the
+// phone's own account picker runs instead; its ID token then signs in *this*
+// (JS) Firebase Auth — the same account as on the website.
+async function nativeGoogleSignIn() {
+  const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
+  try {
+    const { credential } = await FirebaseAuthentication.signInWithGoogle({ skipNativeAuth: true });
+    return await signInWithCredential(auth, GoogleAuthProvider.credential(credential?.idToken, credential?.accessToken));
+  } catch (err) {
+    if (!String(err?.code || "").startsWith("auth/") && /cancel|closed/i.test(String(err?.message))) throw cancelled();
+    throw err;
+  }
+}
+
+// Kakao in the app: Kakao's login page in the browser, back into the app via
+// kr.tripplanner.app://auth/kakao, then the id_token the server parked for
+// this attempt's random `state` (see kakaoCallback in functions/index.js)
+// signs in as the same oidc.kakao account the website uses.
+const KAKAO_REST_KEY = "ff139dec181f0ffcdd2d64bad5987cba";
+const KAKAO_REDIRECT_URI = "https://tripplanner.kr/auth/kakao/callback";
+
+async function nativeKakaoSignIn() {
+  const [{ App }, { Browser }] = await Promise.all([import("@capacitor/app"), import("@capacitor/browser")]);
+  const state = [...crypto.getRandomValues(new Uint8Array(20))].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const url = "https://kauth.kakao.com/oauth/authorize?" + new URLSearchParams({
+    client_id: KAKAO_REST_KEY, redirect_uri: KAKAO_REDIRECT_URI, response_type: "code", scope: "openid", state,
+  });
+
+  // Settles when the browser sends the user back, or when they close it.
+  const result = await new Promise((resolve) => {
+    const subs = [];
+    const done = (value) => { subs.forEach((s) => Promise.resolve(s).then((h) => h.remove())); resolve(value); };
+    subs.push(App.addListener("appUrlOpen", ({ url: back }) => {
+      if (!back.startsWith("kr.tripplanner.app://auth/kakao")) return;
+      Browser.close().catch(() => {});
+      done(new URL(back.replace("kr.tripplanner.app://", "https://x/")).searchParams.get("result") || "failed");
+    }));
+    // Closed by hand — which also happens when KakaoTalk finished the login
+    // in another tab and the return link was missed; try the claim anyway.
+    subs.push(Browser.addListener("browserFinished", () => setTimeout(() => done("closed"), 800)));
+    Browser.open({ url }).catch(() => done("failed"));
+  });
+
+  if (result === "cancelled") throw cancelled();
+  let idToken;
+  try {
+    ({ idToken } = await callFunction("claimKakaoLogin", { state }));
+  } catch (err) {
+    if (result === "closed") throw cancelled();
+    throw Object.assign(new Error("kakao sign-in failed"), { code: "auth/internal-error", cause: err });
+  }
+  return signInWithCredential(auth, new OAuthProvider(KAKAO_OIDC_PROVIDER_ID).credential({ idToken }));
+}
+
 export function signInWithGoogle() {
+  if (isNativeApp) return nativeGoogleSignIn();
   return signInWithPopup(auth, new GoogleAuthProvider());
 }
 
 export function signInWithKakao() {
+  if (isNativeApp) return nativeKakaoSignIn();
   return signInWithPopup(auth, new OAuthProvider(KAKAO_OIDC_PROVIDER_ID));
 }
 

@@ -99,3 +99,7 @@ app/src/main/assets/public
 app/src/main/assets/capacitor.config.json
 app/src/main/assets/capacitor.plugins.json
 app/src/main/res/xml/config.xml
+
+# Firebase Android config (API key) — kept out of the public repo like .env.local;
+# regenerate with: npx firebase-tools@13 apps:sdkconfig ANDROID <appId> -o android/app/google-services.json
+app/google-services.json

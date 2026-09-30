@@ -26,6 +26,9 @@ export function useNativeShell({ navigate, location }) {
           else App.exitApp();
         }),
         App.addListener("appUrlOpen", ({ url }) => {
+          // Only site links; the app's own scheme (sign-in return) is
+          // handled where the sign-in started.
+          if (!url.startsWith("https://")) return;
           try {
             const u = new URL(url);
             state.current.navigate(u.pathname + u.search);

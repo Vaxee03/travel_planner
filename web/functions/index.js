@@ -315,3 +315,74 @@ ${preferences ? `사용자가 원하는 조건: "${preferences}". 이 조건에 
     throw new HttpsError("internal", "추천 결과를 처리하지 못했어요. 다시 시도해주세요.");
   }
 });
+
+// ---- Kakao sign-in for the Android/iOS app ----------------------------------
+// The website signs in with Kakao through Firebase's own popup flow. In the
+// app that flow breaks: Kakao's mobile login hops out to the KakaoTalk app
+// and comes back in a different browser tab, which loses the flow's state.
+// So the app runs a plain OAuth code flow instead:
+//   1. the app opens Kakao's login page in the browser with a random `state`
+//   2. Kakao redirects here (/auth/kakao/callback, a hosting rewrite) with a
+//      code, which is swapped for tokens — including Kakao's OIDC id_token
+//   3. the id_token is parked under that `state` for a few minutes and the
+//      browser is sent back into the app (kr.tripplanner.app://auth/kakao)
+//   4. the app claims it once (claimKakaoLogin) and signs in to Firebase with
+//      it as an oidc.kakao credential — the same account as on the website.
+// Uses the REST API key the Firebase oidc.kakao provider is configured with,
+// so the id_token's audience matches what Firebase checks.
+const { defineSecret } = require("firebase-functions/params");
+const KAKAO_CLIENT_SECRET = defineSecret("KAKAO_CLIENT_SECRET");
+const KAKAO_REST_KEY = "ff139dec181f0ffcdd2d64bad5987cba";
+const KAKAO_REDIRECT_URI = "https://tripplanner.kr/auth/kakao/callback";
+const APP_RETURN_URL = "kr.tripplanner.app://auth/kakao";
+const HANDOFF_TTL_MS = 5 * 60 * 1000;
+const handoffs = () => db.collection("kakaoLoginHandoff"); // server-only (no rules match)
+
+exports.kakaoCallback = onRequest({ region: "us-central1", secrets: [KAKAO_CLIENT_SECRET] }, async (req, res) => {
+  const state = String(req.query.state || "");
+  const code = String(req.query.code || "");
+  const back = (result) => res.redirect(302, `${APP_RETURN_URL}?result=${result}`);
+  if (!/^[0-9a-f]{40}$/.test(state)) return res.status(400).send("잘못된 요청이에요.");
+  if (!code) return back(req.query.error === "access_denied" ? "cancelled" : "failed");
+  try {
+    const tokenRes = await fetch("https://kauth.kakao.com/oauth/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded;charset=utf-8" },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        client_id: KAKAO_REST_KEY,
+        client_secret: KAKAO_CLIENT_SECRET.value(),
+        redirect_uri: KAKAO_REDIRECT_URI,
+        code,
+      }),
+    });
+    const tokens = await tokenRes.json();
+    if (!tokenRes.ok || !tokens.id_token) {
+      console.error("kakao token exchange failed", tokenRes.status, tokens.error, tokens.error_description);
+      return back("failed");
+    }
+    await handoffs().doc(state).set({ idToken: tokens.id_token, createdAt: Date.now() });
+    // Drop handoffs nobody came back for.
+    const stale = await handoffs().where("createdAt", "<", Date.now() - HANDOFF_TTL_MS).limit(50).get();
+    await Promise.all(stale.docs.map((d) => d.ref.delete()));
+    return back("ok");
+  } catch (err) {
+    console.error("kakao callback error", err);
+    return back("failed");
+  }
+});
+
+exports.claimKakaoLogin = onCall({ region: "us-central1" }, async (request) => {
+  const state = String(request.data?.state || "");
+  if (!/^[0-9a-f]{40}$/.test(state)) throw new HttpsError("invalid-argument", "잘못된 요청이에요.");
+  const ref = handoffs().doc(state);
+  const idToken = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return null;
+    tx.delete(ref);
+    const { idToken, createdAt } = snap.data();
+    return Date.now() - createdAt <= HANDOFF_TTL_MS ? idToken : null;
+  });
+  if (!idToken) throw new HttpsError("not-found", "로그인 정보가 없거나 만료됐어요. 다시 시도해주세요.");
+  return { idToken };
+});
