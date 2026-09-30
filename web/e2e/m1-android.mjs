@@ -18,7 +18,9 @@ const adb = (...args) => execFileSync(ADB, args, { maxBuffer: 64 << 20 }).toStri
 const topActivity = () => (adb("shell", "dumpsys", "activity", "activities").match(/topResumedActivity=ActivityRecord\{\S+ \S+ (\S+)/) || [])[1] || "";
 const inApp = () => topActivity().startsWith(PKG + "/");
 const shot = (name) => fs.writeFileSync(new URL(`m-${name}.png`, SHOTS), execFileSync(ADB, ["exec-out", "screencap", "-p", "-d", DISPLAY], { maxBuffer: 64 << 20 }));
-const key = (k) => adb("shell", "input", "keyevent", k);
+// Send keys to the main display: this phone (a flip) also has a cover
+// display, and after a native dialog key events can land on that one.
+const key = (k) => adb("shell", "input", "-d", "0", "keyevent", k);
 const A0 = "앱 설치·실행", A1 = "화면·레이아웃", A2 = "여행·일정 (앱)", A3 = "안드로이드 기능", A4 = "링크로 앱 열기", A5 = "알림", A6 = "안정성";
 
 let browser = null;
@@ -83,11 +85,13 @@ await tc("M-01", A0, "앱 서랍의 아이콘·이름",
     key("KEYCODE_WAKEUP"); key("KEYCODE_HOME"); await wait(1000);
     adb("shell", "input", "swipe", "540", "2200", "540", "700", "300"); await wait(1500);
     let bounds = null;
-    for (let i = 0; i < 8 && !bounds; i++) {
+    // The drawer may reopen on any page: page forward, then back.
+    for (let i = 0; i < 16 && !bounds; i++) {
       adb("shell", "uiautomator", "dump", "/sdcard/ui.xml");
-      const m = adb("shell", "cat", "/sdcard/ui.xml").match(/content-desc="여행 플래너"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/);
+      const m = adb("shell", "cat", "/sdcard/ui.xml").match(/(?:text|content-desc)="여행 플래너"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/);
       if (m) bounds = m.slice(1).map(Number);
-      else { adb("shell", "input", "swipe", "900", "1300", "150", "1300", "250"); await wait(1200); }
+      else if (i < 8) { adb("shell", "input", "swipe", "900", "1300", "150", "1300", "250"); await wait(1200); }
+      else { adb("shell", "input", "swipe", "150", "1300", "900", "1300", "250"); await wait(1200); }
     }
     assert(bounds, "app not found in the drawer");
     shot("drawer");
@@ -194,13 +198,14 @@ await tc("M-08", A3, "뒤로가기 버튼 — 작성 중인 내용이 있을 때
   async () => {
     await click(p, "button", "+ 항목 추가");
     await fill(p, { text: "쓰다 만 내용" });
+    // Press OK on the real Android dialog like a person would. Answering it
+    // through DevTools instead (page.on("dialog")) leaves the WebView owing
+    // the dialog a back press, so the next back key (M-09) goes missing.
     let asked = null;
-    p.once("dialog", async (d) => { asked = d.message(); await d.accept(); });
     key("KEYCODE_BACK"); await wait(1200);
-    if (!asked) {
-      // Capacitor shows window.confirm as a native Android dialog.
+    {
       const d = nativeDialog();
-      if (/사라져요/.test(d.text)) { asked = (d.text.match(/[^/]*사라져요[^/]*/) || [d.text])[0].trim(); d.press("확인") || d.press("OK"); await wait(1000); }
+      if (/사라져요/.test(d.text)) { asked = (d.text.match(/[^/]*사라져요[^/]*/) || [d.text])[0].trim(); d.press("OK") || d.press("확인"); await wait(1000); }
     }
     assert(asked, "no confirm");
     assert(!(await modalOpen(p)), "still open after confirming");
@@ -215,9 +220,14 @@ await tc("M-09", A3, "뒤로가기 버튼 — 열린 날짜 → 여행 → 목�
     await click(p, "button, a", "자세히");
     await waitFor(p, () => [...document.querySelectorAll(".back-link")].some((b) => b.innerText.includes("일정 목록으로")), { label: "day view" });
     const tripPath = await path();
-    key("KEYCODE_BACK"); await wait(900);
-    const dayClosed = await p.evaluate(() => ![...document.querySelectorAll(".back-link")].some((b) => b.innerText.includes("일정 목록으로")));
-    assert(dayClosed && (await path()) === tripPath, "day view not closed first");
+    key("KEYCODE_BACK");
+    let dayClosed = false;
+    for (let i = 0; i < 15 && !dayClosed; i++) {
+      await wait(200);
+      dayClosed = await p.evaluate(() => ![...document.querySelectorAll(".back-link")].some((b) => b.innerText.includes("일정 목록으로")));
+    }
+    const afterFirst = await path();
+    assert(dayClosed && afterFirst === tripPath, `day view not closed first (day still open: ${!dayClosed}, path ${afterFirst})`);
     key("KEYCODE_BACK"); await wait(900);
     assert((await path()) === "/", "second back went to " + (await path()));
     key("KEYCODE_BACK"); await wait(1500);
@@ -257,6 +267,11 @@ await tc("M-12", A3, "동행자 초대 — 휴대폰 공유 창",
   "여행 화면 '동행자 초대' → '📤 공유하기'",
   "안드로이드 공유 창(카카오톡·메시지 등)이 뜸",
   async () => {
+    // Count by title: leftovers of an interrupted earlier run share it.
+    const countTitle = () => p.evaluate((t) => [...document.querySelectorAll(".trip-card-title")].filter((e) => e.innerText.trim() === t).length, TITLE);
+    await p.goto("https://localhost/").catch(() => {});
+    await waitFor(p, () => !!document.querySelector(".trip-card-title"), { label: "trip list", timeout: 15000 });
+    const before = await countTitle();
     await p.goto("https://localhost/trip/" + tripId + "/itinerary").catch(() => {});
     await waitFor(p, () => !!document.querySelector(".trip-actions"), { label: "trip actions", timeout: 15000 });
     await click(p, ".trip-actions button", "동행자 초대");
@@ -361,14 +376,20 @@ await tc("M-18", A2, "테스트 여행 삭제 (정리)",
   "여행이 지워지고 목록으로 돌아감",
   async () => {
     if (!tripId) return { actual: "만든 여행이 없어 건너뜀", status: "SKIP" };
+    // Count by title: leftovers of an interrupted earlier run share it.
+    const countTitle = () => p.evaluate((t) => [...document.querySelectorAll(".trip-card-title")].filter((e) => e.innerText.trim() === t).length, TITLE);
+    await p.goto("https://localhost/").catch(() => {});
+    await waitFor(p, () => !!document.querySelector(".trip-card-title"), { label: "trip list", timeout: 15000 });
+    const before = await countTitle();
     await p.goto("https://localhost/trip/" + tripId + "/itinerary").catch(() => {});
     await waitFor(p, () => !!document.querySelector(".trip-head"), { label: "trip", timeout: 15000 });
     await click(p, ".trip-head button", "삭제", { exact: true });
     await click(p, ".modal button", "삭제", { exact: true });
     await waitFor(p, () => location.pathname === "/", { label: "home", timeout: 15000 });
-    const still = await p.evaluate((t) => document.body.innerText.includes(t), TITLE);
-    assert(!still, "still listed");
-    return "삭제 후 목록에서 사라짐";
+    await wait(800);
+    const after = await countTitle();
+    assert(after === before - 1, `still listed (${before} → ${after})`);
+    return after ? { actual: `삭제 후 목록에서 사라짐 (이전 실행이 남긴 같은 이름의 테스트 여행 ${after}개는 그대로)`, status: "PASS" } : "삭제 후 목록에서 사라짐";
   });
 
 await tc("M-19", A6, "앱 오류·강제 종료",

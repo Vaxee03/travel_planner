@@ -16,7 +16,12 @@
     </style>
 
 
+    <!-- Launch screen: the app icon on the app's dark background (Android 12+
+         draws the adaptive icon; older versions show @drawable/splash). The
+         web app's AppLoader takes over from the identical picture. -->
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
+        <item name="windowSplashScreenBackground">#16181D</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
     </style>
 </resources>

@@ -36,6 +36,8 @@ function notifyTripChange(tripId, kind) {
     .catch(() => { /* a missed notification isn't worth bothering anyone about */ });
 }
 import Home from "./components/Home";
+import HeaderMenu from "./components/HeaderMenu";
+import AppLoader from "./components/AppLoader";
 import AuthGate from "./components/AuthGate";
 
 // Loaded on demand so the first screen (login / trip list) doesn't have to
@@ -592,11 +594,12 @@ export default function App() {
 
   return (
     <div className="page">
+      {isNativeApp && <AppLoader done={authResolved && (!user || tripsReady)} />}
       <header className="top">
         <Link to={user ? LANDING_HOME : "/"} className="eyebrow brand-link">Trip Planner</Link>
         <div className="top-row">
           <div>
-            <h1><Link to={user ? LANDING_HOME : "/"} className="brand-link">여행 플래너</Link></h1>
+            <h1><Link to={user ? LANDING_HOME : "/"} className="brand-link"><img src="/favicon.svg" alt="" className="brand-icon" />여행 플래너</Link></h1>
             <div className="subline">여러 여행을 관리하고, 다녀온 여행엔 후기와 사진을 남겨보세요.</div>
           </div>
           <div className="btn-row" style={{ alignItems: "center", ...(!user && (loginPage || legalPage) ? { alignSelf: "flex-end" } : null) }}>
@@ -616,12 +619,20 @@ export default function App() {
             {(user || legalPage) && (
               <div className="top-right-stack">
                 {user && (
-                  <span className="btn-row" style={{ alignItems: "center" }}>
+                  <span className="btn-row top-actions-full" style={{ alignItems: "center" }}>
                     <span style={{ color: "var(--nickname)", fontSize: 15, fontWeight: 700 }}>{nickname || "닉네임 없음"}</span>
                     <button className="btn btn-sm" onClick={() => setModal({ type: "edit-nickname", currentNickname: nickname })}>닉네임 수정</button>
                     {isNativeApp && <button className="btn btn-sm" onClick={openPushSettings}>알림</button>}
                     <button className="btn btn-sm" onClick={handleSignOut}>로그아웃</button>
                   </span>
+                )}
+                {user && (
+                  <HeaderMenu
+                    nickname={nickname}
+                    onEditNickname={() => setModal({ type: "edit-nickname", currentNickname: nickname })}
+                    onPushSettings={isNativeApp ? openPushSettings : null}
+                    onSignOut={handleSignOut}
+                  />
                 )}
                 {legalPage && (
                   // Terms/privacy are reached from the landing page's footer,
