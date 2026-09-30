@@ -14,6 +14,7 @@ import {
 import { computePerms, PERMISSION_CATEGORIES } from "./lib/permissions";
 import { isNativeApp } from "./lib/platform";
 import { useNativeShell } from "./lib/useNativeShell";
+import { addBackHandler } from "./lib/backHandlers";
 import { reportError } from "./lib/errorReporting";
 // App only (Firestore-backed like lib/data, so loaded on demand).
 const loadPush = () => import("./lib/push");
@@ -79,6 +80,8 @@ export default function App() {
   const tripId = tripMatch?.params.tripId || null;
   const tab = TAB_KEYS.includes(tripMatch?.params.tab) ? tripMatch.params.tab : "itinerary";
   const [dayIdx, setDayIdx] = useState(null);
+  // An open day isn't in the URL; the Android back button closes it first.
+  useEffect(() => (dayIdx == null ? undefined : addBackHandler(() => { setDayIdx(null); return true; })), [dayIdx]);
   const [modal, setModal] = useState(null);
   // A one-off notice shown above the page (e.g. an invite link that failed).
   const [flash, setFlash] = useState(null);
@@ -186,8 +189,11 @@ export default function App() {
   function goHome() {
     navigate("/");
   }
+  // Switching tabs replaces the history entry instead of adding one, so
+  // back (browser or Android) leaves the trip rather than stepping back
+  // through every tab looked at.
   function setTab(key) {
-    navigate(`/trip/${tripId}/${key}`);
+    navigate(`/trip/${tripId}/${key}`, { replace: true });
   }
   // Forms that act on an existing item remember the trip as it was when they
   // opened: the live trip keeps updating from other members' edits, so

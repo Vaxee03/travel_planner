@@ -207,21 +207,22 @@ await tc("M-08", A3, "뒤로가기 버튼 — 작성 중인 내용이 있을 때
     return `확인 창 "${asked}" → 확인 누르면 닫힘`;
   });
 
-await tc("M-09", A3, "뒤로가기 버튼 — 이전 화면으로, 목록에서는 앱 종료",
-  "여행 화면에서 뒤로가기 반복",
-  "여행 → 내 여행 목록 → 앱이 닫혀 홈 화면",
+await tc("M-09", A3, "뒤로가기 버튼 — 열린 날짜 → 여행 → 목록 → 앱 종료",
+  "여러 탭을 오간 뒤 첫째 날 '자세히'를 연 상태에서 뒤로가기 반복",
+  "날짜 화면이 먼저 닫히고, 다음 한 번에 목록, 목록에서 한 번 더 누르면 앱 종료",
   async () => {
-    const steps = [];
-    for (let i = 0; i < 10 && (await path()) !== "/"; i++) { key("KEYCODE_BACK"); await wait(900); steps.push((await path()).replace(/^\/trip\/[^/]+\//, "여행/")); }
-    assert((await path()) === "/", steps.join(" → "));
+    for (const t of ["예산", "체크리스트", "일정"]) { await click(p, ".tab", t); await wait(400); }
+    await click(p, "button, a", "자세히");
+    await waitFor(p, () => [...document.querySelectorAll(".back-link")].some((b) => b.innerText.includes("일정 목록으로")), { label: "day view" });
+    const tripPath = await path();
+    key("KEYCODE_BACK"); await wait(900);
+    const dayClosed = await p.evaluate(() => ![...document.querySelectorAll(".back-link")].some((b) => b.innerText.includes("일정 목록으로")));
+    assert(dayClosed && (await path()) === tripPath, "day view not closed first");
+    key("KEYCODE_BACK"); await wait(900);
+    assert((await path()) === "/", "second back went to " + (await path()));
     key("KEYCODE_BACK"); await wait(1500);
     assert(!inApp(), "still in app: " + topActivity());
-    const presses = steps.length;
-    return {
-      actual: `뒤로가기 ${presses}번 만에 목록: ${steps.join(" → ")} → 목록에서 한 번 더 누르면 앱 종료`,
-      status: presses <= 1 ? "PASS" : "WARN",
-      note: presses > 1 ? "여행 안에서 탭을 바꿀 때마다 기록이 쌓여, 뒤로가기가 목록으로 바로 가지 않고 봤던 탭을 거꾸로 거쳐 감" : "",
-    };
+    return "날짜 닫힘 → 목록 → 앱 종료 (탭을 여러 번 바꿔도 뒤로가기 한 번에 목록)";
   });
 
 await tc("M-10", A4, "초대 링크로 앱 열기 (App Links)",
