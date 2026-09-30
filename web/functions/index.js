@@ -123,7 +123,10 @@ exports.ogPage = onRequest({ region: "us-central1" }, async (req, res) => {
   try {
     const meta = await previewFor(req.path);
     if (meta) {
-      html = html.replace(/<!--og:start-->[\s\S]*?<!--og:end-->/, previewBlock({ ...meta, url: origin + req.path, image: `${origin}/og.jpg` }));
+      // A function, not a string: a replacement string would treat "$'", "$&" etc.
+      // in a trip's title as patterns and splice other parts of the page in.
+      const block = previewBlock({ ...meta, url: origin + req.path, image: `${origin}/og.jpg` });
+      html = html.replace(/<!--og:start-->[\s\S]*?<!--og:end-->/, () => block);
     }
   } catch (err) {
     console.error("ogPage preview", err); // fall back to the generic card

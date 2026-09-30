@@ -6,7 +6,8 @@ import {
   initializeTestEnvironment, assertSucceeds, assertFails,
 } from "@firebase/rules-unit-testing";
 import {
-  doc, getDoc, setDoc, updateDoc, arrayRemove, arrayUnion, deleteField,
+  doc, getDoc, getDocs, setDoc, updateDoc, arrayRemove, arrayUnion, deleteField,
+  collection, query, where, documentId,
 } from "firebase/firestore";
 
 const env = await initializeTestEnvironment({
@@ -104,4 +105,22 @@ test("reviews: each member can change only their own entry", async () => {
   await assertSucceeds(updateDoc(doc(db("bob"), "trips/t1"), { "reviewsBy.bob": { text: "저도요", photos: [], updatedAt: 3 } }));
   // the old shared array is read-only, even for the 방장
   await assertFails(updateDoc(doc(db("owner"), "trips/t1"), { reviews: [] }));
+});
+
+test("users: look up one nickname, never list them all", async () => {
+  await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), "users/bob"), { nickname: "밥" }));
+  await assertSucceeds(getDoc(doc(db("alice"), "users/bob")));
+  await assertFails(getDocs(collection(db("alice"), "users")));
+  await assertFails(getDocs(query(collection(db("alice"), "users"), where(documentId(), "in", ["bob"]))));
+  await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "users/bob")));
+});
+
+test("a new trip must be yours alone", async () => {
+  const mine = { ownerId: "alice", memberIds: ["alice"], memberPermissions: {}, title: "새 여행" };
+  await assertSucceeds(setDoc(doc(db("alice"), "trips/n1"), mine));
+  await assertFails(setDoc(doc(db("alice"), "trips/n2"), { ...mine, ownerId: "bob" }));
+  await assertFails(setDoc(doc(db("alice"), "trips/n3"), { ...mine, memberIds: ["alice", "bob"] }));
+  await assertFails(setDoc(doc(db("alice"), "trips/n4"), { ...mine, memberPermissions: { bob: ["budget"] } }));
+  await assertFails(setDoc(doc(db("alice"), "trips/n5"), { ...mine, publicShareId: "0".repeat(32) }));
+  await assertFails(setDoc(doc(db("alice"), "trips/n6"), { ...mine, blockedIds: ["bob"] }));
 });

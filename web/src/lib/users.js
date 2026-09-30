@@ -1,6 +1,6 @@
 // Account-level nicknames, stored separately from trip documents so the same
 // nickname follows a user across every trip they're a member of.
-import { doc, getDoc, setDoc, getDocs, onSnapshot, collection, query, where, documentId } from "firebase/firestore";
+import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "./db";
 
 export { DEFAULT_NICKNAME, NICKNAME_MAX } from "./nickname";
@@ -16,18 +16,16 @@ export async function fetchNickname(uid) {
   return nickname;
 }
 
-/** Batched lookup for displaying several uids at once (member lists, item
- * authors). Firestore's `in` filter caps at 30 ids per query, so chunk. */
+/** Lookup for displaying several uids at once (member lists, item
+ * authors). One document read per uid: the security rules only allow
+ * reading user documents individually, never querying the collection. */
 export async function fetchNicknames(uids) {
   const unique = [...new Set(uids.filter(Boolean))];
   const missing = unique.filter((uid) => !cache.has(uid));
-  for (let i = 0; i < missing.length; i += 30) {
-    const chunk = missing.slice(i, i + 30);
-    const snap = await getDocs(query(collection(db, "users"), where(documentId(), "in", chunk)));
-    const found = new Set();
-    snap.forEach((d) => { cache.set(d.id, d.data().nickname || ""); found.add(d.id); });
-    chunk.forEach((uid) => { if (!found.has(uid)) cache.set(uid, ""); });
-  }
+  await Promise.all(missing.map(async (uid) => {
+    const snap = await getDoc(doc(db, "users", uid));
+    cache.set(uid, snap.exists() ? snap.data().nickname || "" : "");
+  }));
   const result = {};
   unique.forEach((uid) => { result[uid] = cache.get(uid) || ""; });
   return result;
@@ -40,20 +38,15 @@ export async function fetchNicknames(uids) {
 export function watchNicknames(uids, onChange) {
   const unique = [...new Set(uids.filter(Boolean))];
   const emit = () => onChange(Object.fromEntries(unique.map((uid) => [uid, cache.get(uid) || ""])));
-  const unsubs = [];
-  for (let i = 0; i < unique.length; i += 30) {
-    const chunk = unique.slice(i, i + 30);
-    unsubs.push(onSnapshot(
-      query(collection(db, "users"), where(documentId(), "in", chunk)),
-      (snap) => {
-        const found = new Set();
-        snap.forEach((d) => { cache.set(d.id, d.data().nickname || ""); found.add(d.id); });
-        chunk.forEach((uid) => { if (!found.has(uid)) cache.set(uid, ""); });
-        emit();
-      },
-      () => { /* keep whatever is cached */ }
-    ));
-  }
+  // One listener per user document (see fetchNicknames on why not a query).
+  const unsubs = unique.map((uid) => onSnapshot(
+    doc(db, "users", uid),
+    (snap) => {
+      cache.set(uid, snap.exists() ? snap.data().nickname || "" : "");
+      emit();
+    },
+    () => { /* keep whatever is cached */ }
+  ));
   if (unique.every((uid) => cache.has(uid))) emit();
   return () => unsubs.forEach((u) => u());
 }
