@@ -1,0 +1,4 @@
+
+# Firebase CLI debug logs can contain request bodies (e.g. secret values)
+firebase-debug.log
+firebase-debug.*.log
