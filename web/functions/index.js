@@ -494,7 +494,9 @@ exports.notifyTripChange = onCall({ region: PUSH_REGION }, async (request) => {
 });
 
 // "테스트 알림 보내기" in the app's 알림 설정: only to the caller's own
-// phones, at most once a minute.
+// phones, at most once a minute. Sent 5 seconds after the tap, so there's
+// time to leave the app and see it arrive in the status bar (a notification
+// that lands while the app is open only shows as an in-app notice).
 exports.sendTestPush = onCall({ region: PUSH_REGION }, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "로그인이 필요해요.");
@@ -507,6 +509,8 @@ exports.sendTestPush = onCall({ region: PUSH_REGION }, async (request) => {
   });
   if (!open) throw new HttpsError("resource-exhausted", "잠시 후 다시 시도해주세요.");
   const devices = await db.collection(`users/${uid}/devices`).get();
+  if (devices.empty) return { sent: 0 };
+  await new Promise((r) => setTimeout(r, 5000));
   const sent = await sendPush(devices.docs.map((d) => ({ uid, token: d.id })), {
     title: "여행 플래너", body: "알림이 잘 도착했어요! 🎉", path: "/",
   });

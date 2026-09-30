@@ -14,17 +14,43 @@ export const PUSH_CHANNEL_ID = "trip_updates";
 export const DEFAULT_PUSH_PREFS = { tripChanges: true, reminders: true };
 
 let currentToken = null;
+let currentUid = null;
 let listeners = [];
 
 const deviceRef = (uid, token) => doc(db, "users", uid, "devices", token);
 const prefsRef = (uid) => doc(db, "users", uid, "private", "prefs");
 
-/** After sign-in in the app: ask for permission (once — Android shows its
- * own dialog), save this phone's token, and route notification taps. */
-export async function startPush(uid, navigate) {
-  if (!isNativeApp) return;
+async function saveToken(uid, token) {
+  if (!token) return;
+  if (currentToken && currentToken !== token) await deleteDoc(deviceRef(uid, currentToken)).catch(() => {});
+  currentToken = token;
+  await setDoc(deviceRef(uid, token), { platform: "android", updatedAt: Date.now() });
+}
+
+/** Fetches this phone's token and saves it. Google Play services can refuse
+ * the first attempt (SERVICE_NOT_AVAILABLE right after launch), so this is
+ * retried whenever the app comes back to the foreground and right before a
+ * test notification. Resolves true once the phone is registered. */
+export async function registerDevice(uid = currentUid) {
+  if (!isNativeApp || !uid) return false;
   const { FirebaseMessaging } = await import("@capacitor-firebase/messaging");
+  if ((await FirebaseMessaging.checkPermissions()).receive !== "granted") return false;
+  const { token } = await FirebaseMessaging.getToken();
+  await saveToken(uid, token);
+  return Boolean(token);
+}
+
+/** After sign-in in the app: ask for permission (once — Android shows its
+ * own dialog), save this phone's token, and route notification taps.
+ * `onForeground({ title, body, path })` gets notifications that arrive while
+ * the app is open — Android doesn't show those in the status bar. */
+export async function startPush(uid, navigate, onForeground) {
+  if (!isNativeApp) return;
+  const [{ FirebaseMessaging }, { App }] = await Promise.all([
+    import("@capacitor-firebase/messaging"), import("@capacitor/app"),
+  ]);
   stopListeners();
+  currentUid = uid;
   let { receive } = await FirebaseMessaging.checkPermissions();
   if (receive === "prompt" || receive === "prompt-with-rationale") {
     ({ receive } = await FirebaseMessaging.requestPermissions());
@@ -35,21 +61,19 @@ export async function startPush(uid, navigate) {
     id: PUSH_CHANNEL_ID, name: "여행 알림", description: "동행자의 변경 사항과 출발 전 알림", importance: 4,
   }).catch(() => {});
 
-  const save = async (token) => {
-    if (!token) return;
-    if (currentToken && currentToken !== token) await deleteDoc(deviceRef(uid, currentToken)).catch(() => {});
-    currentToken = token;
-    await setDoc(deviceRef(uid, token), { platform: "android", updatedAt: Date.now() });
-  };
+  const retry = () => { if (currentUid === uid) registerDevice(uid).catch(() => {}); };
   listeners = [
-    FirebaseMessaging.addListener("tokenReceived", ({ token }) => save(token)),
+    FirebaseMessaging.addListener("tokenReceived", ({ token }) => saveToken(uid, token)),
     FirebaseMessaging.addListener("notificationActionPerformed", ({ notification }) => {
       const path = notification?.data?.path;
       if (typeof path === "string" && path.startsWith("/")) navigate(path);
     }),
+    FirebaseMessaging.addListener("notificationReceived", ({ notification }) => {
+      onForeground?.({ title: notification?.title || "", body: notification?.body || "", path: notification?.data?.path });
+    }),
+    App.addListener("appStateChange", ({ isActive }) => { if (isActive && !currentToken) retry(); }),
   ];
-  const { token } = await FirebaseMessaging.getToken();
-  await save(token);
+  await registerDevice(uid).catch(() => setTimeout(retry, 5000));
 }
 
 function stopListeners() {
@@ -64,6 +88,7 @@ export async function stopPush(uid) {
   stopListeners();
   const token = currentToken;
   currentToken = null;
+  currentUid = null;
   if (uid && token) await deleteDoc(deviceRef(uid, token)).catch(() => {});
   const { FirebaseMessaging } = await import("@capacitor-firebase/messaging");
   await FirebaseMessaging.deleteToken().catch(() => {});

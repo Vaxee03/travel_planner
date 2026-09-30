@@ -203,7 +203,11 @@ export default function App() {
   useEffect(() => {
     if (!isNativeApp || !pushUid) return;
     loadPush()
-      .then((p) => p.startPush(pushUid, (path) => navigateRef.current(path)))
+      .then((p) => p.startPush(
+        pushUid,
+        (path) => navigateRef.current(path),
+        ({ title, body }) => setFlash(`🔔 ${[title, body].filter(Boolean).join(" · ")}`),
+      ))
       .catch((err) => reportError(err, "push-start"));
   }, [pushUid]);
 

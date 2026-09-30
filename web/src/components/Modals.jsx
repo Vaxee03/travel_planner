@@ -1113,20 +1113,22 @@ function ItemLocationField({ initial, destination }) {
 
 /** 알림 설정: sends a notification to this account's own phones. */
 function TestPushButton() {
-  const [state, setState] = useState(null); // null | "sending" | message
+  const [state, setState] = useState(null); // status message under the button
   async function send() {
-    setState("sending");
+    setState("5초 뒤에 알림이 와요. 홈 화면으로 나가서 확인해보세요.");
     try {
+      const { registerDevice } = await import("../lib/push");
+      await registerDevice().catch(() => false);
       const { sent } = await callFunction("sendTestPush", {}, { region: "asia-northeast3" });
-      setState(sent ? "보냈어요. 잠시 후 알림이 와요." : "이 휴대폰이 아직 등록되지 않았어요. 앱을 다시 열어주세요.");
+      if (!sent) setState("이 휴대폰을 등록하지 못했어요. 인터넷 연결을 확인하고 앱을 다시 열어주세요.");
     } catch (err) {
       setState(err?.code === "functions/resource-exhausted" ? "1분 뒤에 다시 시도해주세요." : "보내지 못했어요. 잠시 후 다시 시도해주세요.");
     }
   }
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 12px", flexWrap: "wrap" }}>
-      <button type="button" className="btn btn-sm" disabled={state === "sending"} onClick={send}>테스트 알림 보내기</button>
-      {state && state !== "sending" && <span style={{ fontSize: 13, color: "var(--ink-soft)" }}>{state}</span>}
+      <button type="button" className="btn btn-sm" disabled={Boolean(state) && state.startsWith("5초")} onClick={send}>테스트 알림 보내기</button>
+      {state && <span style={{ fontSize: 13, color: "var(--ink-soft)" }}>{state}</span>}
     </div>
   );
 }
