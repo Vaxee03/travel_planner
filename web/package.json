@@ -16,6 +16,7 @@
     "og": "node scripts/make-og.mjs"
   },
   "dependencies": {
+    "@capacitor-firebase/app-check": "^8.5.2",
     "@capacitor-firebase/authentication": "^8.5.2",
     "@capacitor-firebase/messaging": "^8.5.2",
     "@capacitor/android": "^8.5.2",

@@ -1,4 +1,9 @@
 const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
+
+// App Check (see src/lib/appCheck.js): the app sends a token with every call.
+// Off until the console metrics show nearly all requests verified — then set
+// this to true and redeploy, and callables without a valid token are refused.
+const APP_CHECK_ENFORCED = false;
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
@@ -141,7 +146,7 @@ exports.ogPage = onRequest({ region: "us-central1" }, async (req, res) => {
 // Callable signed out too (errors can happen before login); every field is
 // truncated and each server instance drops floods from a single caller.
 const recentReports = new Map(); // caller → { windowStart, count }
-exports.logClientError = onCall({ region: "us-central1" }, async (request) => {
+exports.logClientError = onCall({ enforceAppCheck: APP_CHECK_ENFORCED, region: "us-central1" }, async (request) => {
   const caller = request.auth?.uid || request.rawRequest?.ip || "anon";
   const now = Date.now();
   const entry = recentReports.get(caller);
@@ -170,7 +175,7 @@ exports.logClientError = onCall({ region: "us-central1" }, async (request) => {
 // and returns just the itinerary. Callable without sign-in; the id is a
 // random 32-hex string only the 방장 hands out, and turning the link off
 // (clearing publicShareId) makes it stop resolving immediately.
-exports.getPublicTrip = onCall({ region: "us-central1" }, async (request) => {
+exports.getPublicTrip = onCall({ enforceAppCheck: APP_CHECK_ENFORCED, region: "us-central1" }, async (request) => {
   const shareId = String(request.data?.shareId || "");
   if (!/^[0-9a-f]{32}$/.test(shareId)) {
     throw new HttpsError("not-found", "공유가 중지됐거나 없는 링크예요.");
@@ -191,7 +196,7 @@ exports.getPublicTrip = onCall({ region: "us-central1" }, async (request) => {
 //   - otherwise              → they're just removed, along with their
 //                               review posts and review photos
 // then their nickname doc and Auth account are deleted.
-exports.deleteAccount = onCall({ region: "us-central1" }, async (request) => {
+exports.deleteAccount = onCall({ enforceAppCheck: APP_CHECK_ENFORCED, region: "us-central1" }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "로그인이 필요해요.");
   }
@@ -270,7 +275,7 @@ function extractJson(text) {
   return JSON.parse(candidate.slice(start, end + 1));
 }
 
-exports.recommendRestaurants = onCall({ secrets: ["GEMINI_API_KEY"], region: "us-central1" }, async (request) => {
+exports.recommendRestaurants = onCall({ enforceAppCheck: APP_CHECK_ENFORCED, secrets: ["GEMINI_API_KEY"], region: "us-central1" }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "로그인이 필요해요.");
   }
@@ -327,13 +332,16 @@ ${preferences ? `사용자가 원하는 조건: "${preferences}". 이 조건에 
 // app that flow breaks: Kakao's mobile login hops out to the KakaoTalk app
 // and comes back in a different browser tab, which loses the flow's state.
 // So the app runs a plain OAuth code flow instead:
-//   1. the app opens Kakao's login page in the browser with a random `state`
+//   1. the app opens Kakao's login page in the browser with
+//      state = SHA-256(verifier), the verifier being a secret only the app has
 //   2. Kakao redirects here (KAKAO_REDIRECT_URI) with a
 //      code, which is swapped for tokens — including Kakao's OIDC id_token
 //   3. the id_token is parked under that `state` for a few minutes and the
 //      browser is sent back into the app (kr.tripplanner.app://auth/kakao)
-//   4. the app claims it once (claimKakaoLogin) and signs in to Firebase with
-//      it as an oidc.kakao credential — the same account as on the website.
+//   4. the app claims it once with the verifier (claimKakaoLogin) — knowing
+//      the state alone (browser history, request logs) isn't enough — and
+//      signs in to Firebase with it as an oidc.kakao credential, the same
+//      account as on the website.
 // Uses the REST API key the Firebase oidc.kakao provider is configured with,
 // so the id_token's audience matches what Firebase checks. These two run in
 // Seoul, next to the Firestore database and Kakao's servers — in us-central1
@@ -357,7 +365,7 @@ exports.kakaoCallback = onRequest({ region: KAKAO_REGION, secrets: [KAKAO_CLIENT
   const state = String(req.query.state || "");
   const code = String(req.query.code || "");
   const back = (result) => res.redirect(302, `${APP_RETURN_URL}?result=${result}`);
-  if (!/^[0-9a-f]{40}$/.test(state)) return res.status(400).send("잘못된 요청이에요.");
+  if (!/^[0-9a-f]{64}$/.test(state)) return res.status(400).send("잘못된 요청이에요.");
   if (!code) return back(req.query.error === "access_denied" ? "cancelled" : "failed");
   try {
     const tokenRes = await fetch("https://kauth.kakao.com/oauth/token", {
@@ -384,10 +392,11 @@ exports.kakaoCallback = onRequest({ region: KAKAO_REGION, secrets: [KAKAO_CLIENT
   }
 });
 
-exports.claimKakaoLogin = onCall({ region: KAKAO_REGION }, async (request) => {
+exports.claimKakaoLogin = onCall({ enforceAppCheck: APP_CHECK_ENFORCED, region: KAKAO_REGION }, async (request) => {
   if (request.data?.warm) return { ok: true }; // see kakaoCallback
-  const state = String(request.data?.state || "");
-  if (!/^[0-9a-f]{40}$/.test(state)) throw new HttpsError("invalid-argument", "잘못된 요청이에요.");
+  const verifier = String(request.data?.verifier || "");
+  if (!/^[0-9a-f]{64}$/.test(verifier)) throw new HttpsError("invalid-argument", "잘못된 요청이에요.");
+  const state = require("node:crypto").createHash("sha256").update(verifier).digest("hex");
   const ref = handoffs().doc(state);
   // Alongside the claim (not on the redirect path): drop handoffs nobody
   // came back for.
@@ -459,7 +468,7 @@ async function sendPush(targets, { title, body, path }) {
   return res.successCount;
 }
 
-exports.notifyTripChange = onCall({ region: PUSH_REGION }, async (request) => {
+exports.notifyTripChange = onCall({ enforceAppCheck: APP_CHECK_ENFORCED, region: PUSH_REGION }, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "로그인이 필요해요.");
   const tripId = String(request.data?.tripId || "");
@@ -497,7 +506,7 @@ exports.notifyTripChange = onCall({ region: PUSH_REGION }, async (request) => {
 // phones, at most once a minute. Sent 5 seconds after the tap, so there's
 // time to leave the app and see it arrive in the status bar (a notification
 // that lands while the app is open only shows as an in-app notice).
-exports.sendTestPush = onCall({ region: PUSH_REGION }, async (request) => {
+exports.sendTestPush = onCall({ enforceAppCheck: APP_CHECK_ENFORCED, region: PUSH_REGION }, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "로그인이 필요해요.");
   const gate = db.doc(`pushThrottle/test_${uid}`);

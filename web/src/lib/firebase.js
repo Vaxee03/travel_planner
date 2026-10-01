@@ -6,6 +6,7 @@ import {
   setPersistence, browserLocalPersistence, browserSessionPersistence, sendPasswordResetEmail,
 } from "firebase/auth";
 import { isNativeApp } from "./platform";
+import { startAppCheck } from "./appCheck";
 
 // Firebase console → Authentication → Sign-in method → Add new provider →
 // OpenID Connect. Must be created there with this exact Provider ID.
@@ -28,6 +29,8 @@ export const useEmulators = import.meta.env.VITE_USE_EMULATORS === "1";
 let app, auth;
 if (firebaseReady) {
   app = initializeApp(firebaseConfig);
+  // Before any other service, so their first requests already carry a token.
+  if (!useEmulators) startAppCheck(app);
   auth = getAuth(app);
   // Local-only: `VITE_USE_EMULATORS=1 npm run dev` points everything at the
   // Firebase emulators (firebase emulators:start) instead of production.
@@ -145,8 +148,11 @@ async function nativeGoogleSignIn() {
 
 // Kakao in the app: Kakao's login page in the browser, back into the app via
 // kr.tripplanner.app://auth/kakao, then the id_token the server parked for
-// this attempt's random `state` (see kakaoCallback in functions/index.js)
-// signs in as the same oidc.kakao account the website uses.
+// this attempt (see kakaoCallback in functions/index.js) signs in as the same
+// oidc.kakao account the website uses. PKCE-style: the `state` that travels
+// through the browser is only the SHA-256 of a secret that never leaves the
+// app, and claiming the token takes that secret — so a state seen in a
+// browser history or a server log can't be used to grab the login.
 const KAKAO_REST_KEY = "ff139dec181f0ffcdd2d64bad5987cba";
 // The function's own address, not tripplanner.kr/...: a browser that has
 // visited the website has its service worker, which would answer that path
@@ -160,7 +166,9 @@ async function nativeKakaoSignIn() {
   fetch(`${KAKAO_REDIRECT_URI}?warm=1`, { mode: "no-cors" }).catch(() => {});
   callFunction("claimKakaoLogin", { warm: true }, { region: KAKAO_REGION }).catch(() => {});
   const [{ App }, { Browser }] = await Promise.all([import("@capacitor/app"), import("@capacitor/browser")]);
-  const state = [...crypto.getRandomValues(new Uint8Array(20))].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const hex = (bytes) => [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const verifier = hex(crypto.getRandomValues(new Uint8Array(32)));
+  const state = hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
   const url = "https://kauth.kakao.com/oauth/authorize?" + new URLSearchParams({
     client_id: KAKAO_REST_KEY, redirect_uri: KAKAO_REDIRECT_URI, response_type: "code", scope: "openid", state,
   });
@@ -183,7 +191,7 @@ async function nativeKakaoSignIn() {
   if (result === "cancelled") throw cancelled();
   let idToken;
   try {
-    ({ idToken } = await callFunction("claimKakaoLogin", { state }, { region: KAKAO_REGION }));
+    ({ idToken } = await callFunction("claimKakaoLogin", { verifier }, { region: KAKAO_REGION }));
   } catch (err) {
     if (result === "closed") throw cancelled();
     throw Object.assign(new Error("kakao sign-in failed"), { code: "auth/internal-error", cause: err });
