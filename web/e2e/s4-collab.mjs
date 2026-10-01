@@ -1,6 +1,6 @@
 // Suite 4 — invite / join / permissions / realtime / budget & settlement /
 // checklist / bookings / member management. Three users in separate profiles.
-import { BASE, launch, newUserPage, tc, assert, wait, waitFor, text, click, fill, submitModal, modalOpen, modalText, shot, signInAs, fsGet, fsSet, isoDay } from "./h.mjs";
+import { BASE, launch, newUserPage, tc, assert, wait, waitFor, text, click, fill, submitModal, modalOpen, modalText, answerDialog, shot, signInAs, fsGet, fsSet, isoDay } from "./h.mjs";
 
 const browser = await launch();
 const stamp = Date.now();
@@ -304,7 +304,8 @@ await tc("F-09", A2, "동시 편집 충돌 — 수정 창을 연 사이 다른 �
     po.__lastDialog = null;
     await fill(po, { amount: "95000" });
     await submitModal(po);
-    await wait(1500);
+    await answerDialog(po);
+    await wait(500);
     const t = await fsGet(`trips/${TRIP_ID}`);
     const revived = t.budgetItems.some((i) => i.category === "식비");
     assert(!revived && /먼저|바꿨/.test(po.__lastDialog || ""), `dialog=${po.__lastDialog} revived=${revived}`);

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { drawInviteCard, canvasToBlob, inviteJoinUrl } from "../lib/inviteCard";
 import { saveFile } from "../lib/files";
 import { shareLink, shareButtonLabel } from "../lib/share";
+import { alertDialog } from "../lib/dialogs";
 
 function CopyField({ label, value, copyKey, onCopy, inputRef, mono }) {
   return (
@@ -82,7 +83,7 @@ export default function InviteCard({ trip, onClose }) {
       setCopyKey(Date.now());
       setTimeout(() => setCopyKey(0), 2000);
     } else {
-      window.alert("자동 복사에 실패했어요. 입력창의 텍스트가 선택되어 있으니 Ctrl+C(또는 Cmd+C)로 직접 복사해주세요.");
+      alertDialog("자동 복사에 실패했어요. 입력창의 텍스트가 선택되어 있으니 Ctrl+C(또는 Cmd+C)로 직접 복사해주세요.");
     }
   }
 

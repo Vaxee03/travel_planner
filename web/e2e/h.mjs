@@ -149,6 +149,24 @@ export async function submitModal(page) {
   await wait(600);
 }
 
+/** The app's own confirm / alert (src/lib/dialogs.js): waits for it, keeps
+ * its message in page.__lastDialog, and presses OK (or cancel). */
+export async function answerDialog(page, ok = true, { timeout = 5000 } = {}) {
+  const end = Date.now() + timeout;
+  while (Date.now() < end) {
+    const msg = await page.evaluate((ok) => {
+      const layer = document.querySelector(".dialog-layer");
+      if (!layer) return null;
+      const buttons = layer.querySelectorAll(".modal-actions button");
+      const message = layer.querySelector(".dialog-msg").innerText;
+      (ok ? buttons[buttons.length - 1] : buttons[0]).click();
+      return message;
+    }, ok);
+    if (msg != null) { page.__lastDialog = msg; await wait(150); return msg; }
+    await wait(120);
+  }
+  return null;
+}
 export const modalOpen = (page) => page.evaluate(() => !!document.querySelector(".modal"));
 export const modalText = (page) => page.evaluate(() => [...document.querySelectorAll(".modal")].pop()?.innerText || "");
 

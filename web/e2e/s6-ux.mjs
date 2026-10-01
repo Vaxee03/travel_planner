@@ -1,6 +1,6 @@
 // Suite 6 — everyday UX edge cases: double clicks, back button, closing
 // dialogs, phone-sized forms.
-import { BASE, launch, newUserPage, tc, assert, wait, waitFor, text, click, fill, submitModal, modalOpen, modalText, shot, signInAs, fsGet, fsSet, fsList, isoDay } from "./h.mjs";
+import { BASE, launch, newUserPage, tc, assert, wait, waitFor, text, click, fill, submitModal, modalOpen, modalText, answerDialog, shot, signInAs, fsGet, fsSet, fsList, isoDay } from "./h.mjs";
 
 const browser = await launch();
 const stamp = Date.now();
@@ -85,8 +85,8 @@ await tc("U-04", A, "입력창 닫기 — Esc 키 / 바깥 영역 클릭 (작성
     await waitFor(p, () => !!document.querySelector(".modal input[name=summary]"), { label: "modal" });
     await p.type(".modal input[name=summary]", "작성 중");
     p.__lastDialog = null;
-    await p.mouse.click(5, 5); await wait(500);
-    const asked = p.__lastDialog || "";
+    await p.mouse.click(5, 5);
+    const asked = (await answerDialog(p)) || "";
     const closed = !(await modalOpen(p));
     if (!closed) await click(p, ".modal button", "취소", { exact: true });
     assert(esc && asked.includes("사라져요") && closed, JSON.stringify({ esc, asked, closed }));

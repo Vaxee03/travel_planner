@@ -15,6 +15,8 @@ import { computePerms, PERMISSION_CATEGORIES } from "./lib/permissions";
 import { isNativeApp } from "./lib/platform";
 import { useNativeShell } from "./lib/useNativeShell";
 import { addBackHandler } from "./lib/backHandlers";
+import { alertDialog } from "./lib/dialogs";
+import DialogLayer from "./components/DialogLayer";
 import { reportError } from "./lib/errorReporting";
 // App only (Firestore-backed like lib/data, so loaded on demand).
 const loadPush = () => import("./lib/push");
@@ -271,7 +273,7 @@ export default function App() {
       await fn();
     } catch (err) {
       if (err instanceof StaleEditError) {
-        window.alert("다른 동행자가 이 항목을 먼저 바꿨어요. 화면이 최신 내용으로 바뀌었으니 확인 후 다시 시도해주세요.");
+        alertDialog("다른 동행자가 이 항목을 먼저 바꿨어요. 화면이 최신 내용으로 바뀌었으니 확인 후 다시 시도해주세요.");
         return false;
       }
       throw err;
@@ -715,6 +717,7 @@ export default function App() {
           <ModalHost modal={modal} trip={trip} trips={trips} uid={user?.uid} onClose={closeModal} onSubmit={submitAndNotify} />
         </Suspense>
       )}
+      <DialogLayer />
     </div>
   );
 }

@@ -280,6 +280,10 @@ section{ margin-bottom:44px; }
 .field{ margin-bottom:14px; }
 .field-row{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 .modal-actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:20px; }
+/* In-app confirm / alert (lib/dialogs.js): above any open form. */
+.dialog-layer{ z-index:60; }
+.dialog-box{ max-width:360px; padding:22px 22px 18px; }
+.dialog-msg{ margin:0; font-size:15px; line-height:1.55; white-space:pre-line; overflow-wrap:anywhere; }
 
 .note{ display:flex; gap:10px; align-items:flex-start; font-size:14.5px; color:var(--ink-soft); background:var(--surface-2); border-radius:10px; padding:11px 14px; margin-top:14px; }
 .note .dot{ flex:0 0 auto; width:6px; height:6px; margin-top:7px; border-radius:50%; background:var(--gold); }

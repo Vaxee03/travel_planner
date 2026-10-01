@@ -1,6 +1,6 @@
 // Suite 3 — trips, itinerary, map, memo, duplicate, calendar export.
 import fs from "node:fs";
-import { resetFirestore, BASE, launch, newUserPage, tc, assert, wait, waitFor, text, click, fill, submitModal, modalOpen, modalText, shot, signInAs, fsGet, fsList, tripByTitle, isoDay } from "./h.mjs";
+import { resetFirestore, BASE, launch, newUserPage, tc, assert, wait, waitFor, text, click, fill, submitModal, modalOpen, modalText, answerDialog, shot, signInAs, fsGet, fsList, tripByTitle, isoDay } from "./h.mjs";
 
 await resetFirestore();
 const browser = await launch();
@@ -459,7 +459,7 @@ await tc("T-25", A, "일정이 하나도 없는 여행의 캘린더 내보내기
     await waitFor(p, () => !!document.querySelector(".trip-actions"), { label: "trip" });
     p.__lastDialog = null;
     await click(p, ".trip-actions button", "캘린더로 내보내기");
-    await wait(600);
+    await answerDialog(p);
     assert(p.__lastDialog?.includes("일정이 없어요") && !(await modalOpen(p)), String(p.__lastDialog));
     return `알림: "${p.__lastDialog}"`;
   });

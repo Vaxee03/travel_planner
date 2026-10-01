@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { confirmDialog } from "../lib/dialogs";
 import { callFunction } from "../lib/firebase";
 import { createPortal } from "react-dom";
 import { useJsApiLoader } from "@react-google-maps/api";
@@ -345,9 +346,9 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit: 
   const pressedOverlayRef = useRef(false);
   useEffect(() => { setFormError(null); setBusy(false); busyRef.current = false; dirtyRef.current = false; }, [modal]);
 
-  function requestClose() {
+  async function requestClose() {
     if (busyRef.current) return;
-    if (dirtyRef.current && !window.confirm("작성 중인 내용이 사라져요. 닫을까요?")) return;
+    if (dirtyRef.current && !(await confirmDialog("작성 중인 내용이 사라져요. 닫을까요?", { confirmLabel: "닫기", cancelLabel: "계속 작성", tone: "danger" }))) return;
     onClose();
   }
 

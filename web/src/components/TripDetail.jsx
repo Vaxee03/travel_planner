@@ -10,6 +10,7 @@ import Checklist from "./Checklist";
 import Bookings from "./Bookings";
 import Review from "./Review";
 import Restaurants from "./Restaurants";
+import { alertDialog } from "../lib/dialogs";
 
 const TABS = [
   { key: "itinerary", label: "일정" },
@@ -23,7 +24,7 @@ export default function TripDetail({ trip, uid, perms, tab, setTab, dayIdx, setD
   function confirmIcsExport() {
     const count = (trip.days || []).reduce((n, d) => n + (d.items?.length || 0), 0);
     if (!count) {
-      window.alert("아직 캘린더로 내보낼 일정이 없어요. 일정을 먼저 추가해주세요.");
+      alertDialog("아직 캘린더로 내보낼 일정이 없어요. 일정을 먼저 추가해주세요.");
       return;
     }
     // run() fires inside the confirm click itself, so the download still

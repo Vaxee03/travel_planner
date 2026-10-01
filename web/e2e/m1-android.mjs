@@ -6,7 +6,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import puppeteer from "puppeteer-core";
-import { tc, assert, wait, waitFor, click, fill, submitModal, modalOpen, isoDay } from "./h.mjs";
+import { tc, assert, wait, waitFor, click, fill, submitModal, modalOpen, answerDialog, isoDay } from "./h.mjs";
 
 const ADB = "C:/Users/bjsmo/AppData/Local/Android/Sdk/platform-tools/adb.exe";
 const PKG = "kr.tripplanner.app";
@@ -194,22 +194,23 @@ await tc("M-07", A3, "뒤로가기 버튼 — 열린 창 먼저 닫기",
 
 await tc("M-08", A3, "뒤로가기 버튼 — 작성 중인 내용이 있을 때",
   "'+ 항목 추가'에 내용을 입력한 뒤 뒤로가기",
-  "'작성 중인 내용이 사라져요' 확인이 뜸",
+  "앱 디자인의 '작성 중인 내용이 사라져요' 확인 창이 뜸 (안드로이드 기본 창 아님)",
   async () => {
     await click(p, "button", "+ 항목 추가");
     await fill(p, { text: "쓰다 만 내용" });
-    // Press OK on the real Android dialog like a person would. Answering it
-    // through DevTools instead (page.on("dialog")) leaves the WebView owing
-    // the dialog a back press, so the next back key (M-09) goes missing.
-    let asked = null;
-    key("KEYCODE_BACK"); await wait(1200);
-    {
-      const d = nativeDialog();
-      if (/사라져요/.test(d.text)) { asked = (d.text.match(/[^/]*사라져요[^/]*/) || [d.text])[0].trim(); d.press("OK") || d.press("확인"); await wait(1000); }
-    }
+    // The app's own dialog now (not Android's system one). Back while it's
+    // up answers "계속 작성" and keeps what was typed.
+    const dialogUp = () => p.evaluate(() => !!document.querySelector(".dialog-layer"));
+    key("KEYCODE_BACK");
+    await waitFor(p, () => !!document.querySelector(".dialog-layer"), { label: "in-app confirm" });
+    key("KEYCODE_BACK"); await wait(700);
+    const kept = !(await dialogUp()) && await p.evaluate(() => document.querySelector('.modal [name="text"]')?.value === "쓰다 만 내용");
+    assert(kept, "back on the confirm didn't keep the form");
+    key("KEYCODE_BACK");
+    const asked = await answerDialog(p);
     assert(asked, "no confirm");
     assert(!(await modalOpen(p)), "still open after confirming");
-    return `확인 창 "${asked}" → 확인 누르면 닫힘`;
+    return `확인 창 "${asked}" → 뒤로가기는 '계속 작성'(입력 유지), 닫기 누르면 창 닫힘`;
   });
 
 await tc("M-09", A3, "뒤로가기 버튼 — 열린 날짜 → 여행 → 목록 → 앱 종료",
