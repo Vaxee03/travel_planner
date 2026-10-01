@@ -103,6 +103,10 @@ test("reviews: each member can change only their own entry", async () => {
   await assertSucceeds(updateDoc(doc(db("alice"), "trips/t1"), { "reviewsBy.alice": { text: "좋았어요", photos: [], updatedAt: 1 } }));
   await assertFails(updateDoc(doc(db("bob"), "trips/t1"), { "reviewsBy.alice": { text: "내가 바꿈", photos: [], updatedAt: 2 } }));
   await assertSucceeds(updateDoc(doc(db("bob"), "trips/t1"), { "reviewsBy.bob": { text: "저도요", photos: [], updatedAt: 3 } }));
+  // at most 30 photos each
+  const photos = (n) => Array.from({ length: n }, (_, i) => ({ url: "u" + i, path: "p" + i }));
+  await assertSucceeds(updateDoc(doc(db("alice"), "trips/t1"), { "reviewsBy.alice": { text: "", photos: photos(30), updatedAt: 4 } }));
+  await assertFails(updateDoc(doc(db("alice"), "trips/t1"), { "reviewsBy.alice": { text: "", photos: photos(31), updatedAt: 5 } }));
   // the old shared array is read-only, even for the 방장
   await assertFails(updateDoc(doc(db("owner"), "trips/t1"), { reviews: [] }));
 });

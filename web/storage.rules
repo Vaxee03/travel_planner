@@ -4,18 +4,27 @@ service firebase.storage {
     // Membership is checked against the trip document itself (cross-service
     // rule into the app's named Firestore database), so only people actually
     // in the trip can see or touch its photos.
+    function trip(tripId) {
+      return firestore.get(/databases/travelplanner/documents/trips/$(tripId)).data;
+    }
     function isMember(tripId) {
-      return request.auth != null &&
-        request.auth.uid in firestore.get(/databases/travelplanner/documents/trips/$(tripId)).data.memberIds;
+      return request.auth != null && request.auth.uid in trip(tripId).memberIds;
+    }
+    // Same cap as firestore.rules (reviewsBy.<uid>.photos), counted against
+    // the photos already in the member's review — keep the two in sync.
+    function hasPhotoRoom(tripId, uid) {
+      return trip(tripId).get('reviewsBy', {}).get(uid, {}).get('photos', []).size() < 30;
     }
 
     // Review photos: each member uploads into their own folder, so only the
-    // uploader can delete theirs. Images only, 10MB max.
+    // uploader can delete theirs. Plain photo formats only (no SVG or other
+    // formats that can carry scripts), 10MB max, fewer than 30 per member.
     match /trips/{tripId}/review/{ownerUid}/{fileName} {
       allow read: if isMember(tripId);
       allow create: if isMember(tripId) && request.auth.uid == ownerUid
         && request.resource.size < 10 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
+        && request.resource.contentType.matches('image/(jpeg|png|webp|gif|heic|heif|avif)')
+        && hasPhotoRoom(tripId, ownerUid);
       allow delete: if isMember(tripId) && request.auth.uid == ownerUid;
     }
 

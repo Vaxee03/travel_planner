@@ -61,8 +61,25 @@ test("other members can view but not delete my photo", async () => {
   await assertSucceeds(deleteObject(ref(storage("alice"), "trips/t1/review/alice/a.png")));
 });
 
-test("only images are accepted", async () => {
+test("only plain photo formats are accepted", async () => {
   await assertFails(put("alice", "trips/t1/review/alice/a.html", "text/html"));
+  await assertFails(put("alice", "trips/t1/review/alice/a.svg", "image/svg+xml"));
+  await assertSucceeds(put("alice", "trips/t1/review/alice/a.jpg", "image/jpeg"));
+  await assertSucceeds(put("alice", "trips/t1/review/alice/a.webp", "image/webp"));
+});
+
+test("no upload once the member's review already has 30 photos", async () => {
+  const photo = (i) => ({ mapValue: { fields: { url: { stringValue: "u" + i }, path: { stringValue: "p" + i } } } });
+  const withPhotos = (n) => fetch("http://127.0.0.1:8080/v1/projects/travel-planner-bb32d/databases/travelplanner/documents/trips/t1?updateMask.fieldPaths=reviewsBy", {
+    method: "PATCH",
+    headers: { Authorization: "Bearer owner", "content-type": "application/json" },
+    body: JSON.stringify({ fields: { reviewsBy: { mapValue: { fields: { alice: { mapValue: { fields: { photos: { arrayValue: { values: Array.from({ length: n }, (_, i) => photo(i)) } } } } } } } } } }),
+  });
+  await withPhotos(29);
+  await assertSucceeds(put("alice", "trips/t1/review/alice/29.png"));
+  await withPhotos(30);
+  await assertFails(put("alice", "trips/t1/review/alice/30.png"));
+  await assertSucceeds(put("owner", "trips/t1/review/owner/1.png")); // others unaffected
 });
 
 test("old flat-layout photos: members read/delete, nobody uploads", async () => {

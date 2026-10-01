@@ -4,6 +4,10 @@
 // decode (e.g. HEIC outside Safari) is uploaded as-is.
 
 export const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+/** Per member per trip; firestore.rules and storage.rules enforce the same. */
+export const MAX_PHOTOS = 30;
+/** The formats storage.rules accepts (no SVG etc.). */
+export const PHOTO_TYPES = /^image\/(jpeg|png|webp|gif|heic|heif|avif)$/;
 
 /** Returns a smaller JPEG version of `file` when it's large, otherwise the
  * original file. Never throws. */

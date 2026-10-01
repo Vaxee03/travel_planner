@@ -4,7 +4,7 @@ import { useNicknames } from "../lib/useNicknames";
 import { reportError } from "../lib/errorReporting";
 import { DEFAULT_NICKNAME } from "../lib/users";
 import { reviewPosts, myReviewDraft } from "../lib/utils";
-import { shrinkImage, MAX_PHOTO_BYTES } from "../lib/imageResize";
+import { shrinkImage, MAX_PHOTO_BYTES, MAX_PHOTOS, PHOTO_TYPES } from "../lib/imageResize";
 
 /** A failed upload/save in words a traveller understands (the raw Firebase
  * message was shown before, e.g. "storage/unauthorized"). */
@@ -40,6 +40,11 @@ export default function Review({ trip, uid, canReview, openModal, requestDelete 
     const picked = e.target.files?.[0];
     if (!picked) return;
     setError(null);
+    if ((myPost?.photos?.length || 0) >= MAX_PHOTOS) {
+      setError(`사진은 한 사람당 ${MAX_PHOTOS}장까지 올릴 수 있어요. 다른 사진을 지운 뒤 올려주세요.`);
+      e.target.value = "";
+      return;
+    }
     if (picked.type && !picked.type.startsWith("image/")) {
       setError("사진 파일(JPG, PNG 등)만 올릴 수 있어요.");
       e.target.value = "";
@@ -48,6 +53,10 @@ export default function Review({ trip, uid, canReview, openModal, requestDelete 
     setUploading(true);
     try {
       const file = await shrinkImage(picked);
+      if (!PHOTO_TYPES.test(file.type)) {
+        setError("JPG, PNG, WEBP, HEIC, GIF 사진만 올릴 수 있어요.");
+        return;
+      }
       if (file.size > MAX_PHOTO_BYTES) {
         setError(`사진이 너무 커요(${(file.size / 1024 / 1024).toFixed(1)}MB). 10MB 이하 사진만 올릴 수 있어요.`);
         return;

@@ -87,8 +87,10 @@ service cloud.firestore {
           // old shared reviews array is read-only (only account deletion,
           // server-side, still edits it).
           !changed.hasAny(['reviews']) &&
-          (!changed.hasAny(['reviewsBy']) ||
-            request.resource.data.get('reviewsBy', {}).diff(resource.data.get('reviewsBy', {})).affectedKeys().hasOnly([request.auth.uid]));
+          // At most 30 photos per member per trip (storage.rules has the same cap).
+          (!changed.hasAny(['reviewsBy']) || (
+            request.resource.data.get('reviewsBy', {}).diff(resource.data.get('reviewsBy', {})).affectedKeys().hasOnly([request.auth.uid]) &&
+            request.resource.data.get('reviewsBy', {}).get(request.auth.uid, {}).get('photos', []).size() <= 30));
       }
     }
 
