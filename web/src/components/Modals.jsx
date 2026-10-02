@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { confirmDialog } from "../lib/dialogs";
+import { TermsPage, PrivacyPage } from "./LegalPage";
 import { callFunction } from "../lib/firebase";
 import { createPortal } from "react-dom";
 import { useJsApiLoader } from "@react-google-maps/api";
@@ -347,7 +348,8 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit: 
   useEffect(() => { setFormError(null); setBusy(false); busyRef.current = false; dirtyRef.current = false; }, [modal]);
 
   async function requestClose() {
-    if (busyRef.current) return;
+    // e.g. the terms agreement: only its own buttons close it.
+    if (busyRef.current || modal?.blocking) return;
     if (dirtyRef.current && !(await confirmDialog("작성 중인 내용이 사라져요. 닫을까요?", { confirmLabel: "닫기", cancelLabel: "계속 작성", tone: "danger" }))) return;
     onClose();
   }
@@ -413,7 +415,30 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit: 
   const seenTrip = modal.tripAtOpen || trip;
   let content = null;
 
-  if (modal.type === "confirm") {
+  if (modal.type === "terms-consent") {
+    content = (
+      <form onSubmit={handleSubmit} noValidate>
+        <h3>{modal.isUpdate ? "약관이 바뀌었어요" : "서비스 이용 동의"}</h3>
+        <p style={{ margin: "0 0 14px", color: "var(--ink-soft)", fontSize: 13.5 }}>
+          {modal.isUpdate
+            ? "이용약관과 개인정보처리방침이 바뀌었어요. 계속 이용하려면 내용을 확인하고 동의해주세요."
+            : "여행 플래너를 시작하기 전에 아래 내용을 확인해주세요."}
+        </p>
+        <details className="terms-doc"><summary>이용약관 보기</summary><div className="terms-doc-body"><TermsPage /></div></details>
+        <details className="terms-doc"><summary>개인정보처리방침 보기</summary><div className="terms-doc-body"><PrivacyPage /></div></details>
+        <label className="terms-check">
+          <input type="checkbox" name="agree" required />
+          <span><b>(필수)</b> 만 14세 이상이며, 이용약관에 동의합니다.</span>
+        </label>
+        <p className="terms-hint">서비스 이용에 필요한 개인정보는 개인정보처리방침에 따라 처리돼요.</p>
+        {formError && <div style={{ marginTop: 12 }}><FormNote message={formError} /></div>}
+        <div className="modal-actions">
+          <button type="button" className="btn" onClick={() => onSubmit({ ...modal, decline: true }, {})}>동의하지 않음</button>
+          <button type="submit" className="btn btn-primary">동의하고 시작하기</button>
+        </div>
+      </form>
+    );
+  } else if (modal.type === "confirm") {
     content = (
       <>
         <h3>확인</h3>

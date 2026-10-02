@@ -26,7 +26,8 @@ export function formProblem(form) {
   const v = el.validity;
   const name = labelOf(el);
   let message;
-  if (v.valueMissing) message = el.type === "date" || el.tagName === "SELECT" ? `${eul(name)} 선택해주세요.` : `${eul(name)} 입력해주세요.`;
+  if (v.valueMissing && el.type === "checkbox") message = "필수 항목에 체크해주세요.";
+  else if (v.valueMissing) message = el.type === "date" || el.tagName === "SELECT" ? `${eul(name)} 선택해주세요.` : `${eul(name)} 입력해주세요.`;
   else if (v.typeMismatch && el.type === "email") message = "이메일 형식을 확인해주세요. (예: you@example.com)";
   else if (v.tooShort) message = `${eun(name)} ${el.minLength}자 이상이어야 해요.`;
   else if (v.tooLong) message = `${eun(name)} ${el.maxLength}자까지 입력할 수 있어요.`;

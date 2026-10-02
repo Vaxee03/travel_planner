@@ -100,9 +100,15 @@ service cloud.firestore {
     // pull everyone's uid and nickname. Only the owner writes their own.
     match /users/{uid} {
       allow get: if request.auth != null;
+      // termsVersion / termsAgreedAt: the terms agreement (src/lib/terms.js);
+      // the time it's recorded is always the server's.
       allow write: if request.auth != null && request.auth.uid == uid &&
         (!('nickname' in request.resource.data) ||
-          (request.resource.data.nickname is string && request.resource.data.nickname.size() <= 20));
+          (request.resource.data.nickname is string && request.resource.data.nickname.size() <= 20)) &&
+        (!('termsVersion' in request.resource.data) ||
+          (request.resource.data.termsVersion is string && request.resource.data.termsVersion.size() <= 20)) &&
+        (!request.resource.data.diff(resource == null ? {} : resource.data).affectedKeys().hasAny(['termsAgreedAt']) ||
+          request.resource.data.termsAgreedAt == request.time);
 
       // This user's phones (push tokens) and notification settings — private
       // to them; the push functions read them with admin access.

@@ -2,6 +2,7 @@
 import puppeteer from "puppeteer-core";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
+import { TERMS_VERSION } from "../src/lib/terms.js";
 
 export const BASE = "http://localhost:5173";
 export const HOSTING = "http://127.0.0.1:5000";
@@ -174,7 +175,10 @@ export const modalText = (page) => page.evaluate(() => [...document.querySelecto
 
 /** Signs a page in as `uid` through the emulator-only hook and deals with
  * the first-login nickname prompt. */
+/** Signs in as `uid` with the terms already agreed (the agreement dialog
+ * itself is tested in s2-auth.mjs). */
 export async function signInAs(page, uid, nickname) {
+  await fsMerge(`users/${uid}`, { termsVersion: TERMS_VERSION });
   await page.goto(BASE + "/", { waitUntil: "domcontentloaded" });
   await page.evaluate((uid) => window.__emulatorSignIn(uid), uid);
   await waitFor(page, () => !!document.querySelector("header.top"), { label: "app shell" });
@@ -231,6 +235,12 @@ export async function fsList(coll) {
 export async function fsSet(path, data) {
   const r = await fetch(`${FS}/${path}`, { method: "PATCH", headers: H, body: JSON.stringify({ fields: Object.fromEntries(Object.entries(data).map(([k, v]) => [k, encode(v)])) }) });
   if (!r.ok) throw new Error("fsSet " + r.status + " " + (await r.text()).slice(0, 200));
+}
+/** Like fsSet, but only touches the given fields (the rest of the document stays). */
+export async function fsMerge(path, data) {
+  const mask = Object.keys(data).map((k) => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join("&");
+  const r = await fetch(`${FS}/${path}?${mask}`, { method: "PATCH", headers: H, body: JSON.stringify({ fields: Object.fromEntries(Object.entries(data).map(([k, v]) => [k, encode(v)])) }) });
+  if (!r.ok) throw new Error("fsMerge " + r.status + " " + (await r.text()).slice(0, 200));
 }
 export async function fsDelete(path) { await fetch(`${FS}/${path}`, { method: "DELETE", headers: H }); }
 

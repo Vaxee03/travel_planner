@@ -1,5 +1,6 @@
 // Suite 2 — sign-up / login / password reset / remember-me / nickname.
-import { BASE, launch, newUserPage, tc, assert, wait, waitFor, text, click, fill, submitModal, modalOpen, modalText, shot } from "./h.mjs";
+import { BASE, launch, newUserPage, tc, assert, wait, waitFor, text, click, fill, submitModal, modalOpen, modalText, shot, fsGet, fsSet } from "./h.mjs";
+import { TERMS_VERSION } from "../src/lib/terms.js";
 
 const browser = await launch();
 const A = "로그인·회원가입";
@@ -13,26 +14,35 @@ async function openLogin(p) {
   await wait(800);
   await waitFor(p, () => !!document.querySelector(".auth-card"), { label: "login card" });
 }
-async function typeAuth(p, fields) {
+/** Types into the login/sign-up form; on sign-up also ticks the required
+ * terms box unless `agree: false`. */
+async function typeAuth(p, { agree = true, ...fields }) {
   for (const [name, v] of Object.entries(fields)) {
     await p.evaluate((n) => { const i = document.querySelector(`.auth-card input[name=${n}]`); i.value = ""; }, name);
     await p.type(`.auth-card input[name=${name}]`, v);
   }
+  await p.evaluate((agree) => { const box = document.querySelector(".auth-card input[name=agree]"); if (box && box.checked !== agree) box.click(); }, agree);
 }
 async function toSignup(p) { if (!(await p.$("input[name=passwordConfirm]"))) await click(p, ".auth-switch", "회원가입"); }
 
 const p1 = await newUserPage(browser);
 
 await tc("AU-01", A, "이메일 회원가입 성공",
-  "로그인 화면 → '처음이신가요? 회원가입' → 이메일/비밀번호/확인 입력 → 가입하기",
-  "가입 후 여행 목록 화면으로 이동하고 닉네임 설정 창이 뜸",
+  "로그인 화면 → '처음이신가요? 회원가입' → 이메일/비밀번호/확인 입력 → '(필수) 만 14세 이상… 동의' 체크 → 가입하기",
+  "가입 후 여행 목록 화면으로 이동하고 (약관 창 없이) 닉네임 설정 창이 뜸, 동의 기록 저장",
   async () => {
     await openLogin(p1); await toSignup(p1);
     await typeAuth(p1, { email: EMAIL, password: PW, passwordConfirm: PW });
     await click(p1, ".auth-submit", "가입하기");
-    await waitFor(p1, () => location.pathname === "/" && !!document.querySelector("header.top") && !!document.querySelector(".modal"), { label: "signed in + nickname modal", timeout: 15000 });
+    await waitFor(p1, () => location.pathname === "/" && !!document.querySelector("header.top") && !!document.querySelector(".modal input[name=nickname]"), { label: "signed in + nickname modal", timeout: 15000 });
     const m = await modalText(p1);
-    return `주소 /, 닉네임 창: "${m.split("\n")[0]}"`;
+    const askedTerms = await p1.evaluate(() => !!document.querySelector(".modal input[name=agree]"));
+    const uid = await p1.evaluate(() => JSON.parse(Object.entries(localStorage).find(([k]) => k.startsWith("firebase:authUser"))?.[1] || "null")?.uid
+      || new Promise((res) => { const r = indexedDB.open("firebaseLocalStorageDb"); r.onsuccess = () => { const q = r.result.transaction("firebaseLocalStorage").objectStore("firebaseLocalStorage").getAll(); q.onsuccess = () => res(q.result.find((x) => String(x.fbase_key).startsWith("firebase:authUser"))?.value?.uid || null); }; }));
+    const u = uid && await fsGet(`users/${uid}`);
+    assert(!askedTerms, "terms asked again after ticking them on the sign-up form");
+    assert(u?.termsVersion === TERMS_VERSION && u?.termsAgreedAt, `agreement not recorded: ${JSON.stringify(u)}`);
+    return `주소 /, 닉네임 창: "${m.split("\n")[0]}" (가입 화면에서 동의 → 약관 창 없이 바로), 동의 기록 ${u.termsVersion}`;
   });
 
 await tc("AU-02", A, "닉네임 설정 창 '나중에 하기'",
@@ -330,6 +340,113 @@ await tc("AU-21", A, "로그인 화면 '뒤로가기'",
     await waitFor(p, () => !!document.querySelector(".lp"), { label: "landing direct" });
     await p.browserContext().close();
     return "두 경우 모두 랜딩 복귀";
+  });
+
+// ---- terms agreement (lib/terms.js) -----------------------------------------
+const agreeBox = (p) => p.evaluate(() => !!document.querySelector(".modal input[name=agree]"));
+async function signInFresh(uid, profile) {
+  if (profile) await fsSet(`users/${uid}`, profile);
+  const p = await newUserPage(browser);
+  await p.goto(BASE + "/", { waitUntil: "domcontentloaded" });
+  await waitFor(p, () => typeof window.__emulatorSignIn === "function", { label: "app" });
+  await p.evaluate((uid) => window.__emulatorSignIn(uid), uid);
+  await waitFor(p, () => !!document.querySelector("header.top"), { label: "app shell" });
+  return p;
+}
+
+await tc("AU-22", A, "회원가입 — 약관 동의 체크 안 함",
+  "이메일·비밀번호를 모두 맞게 입력하고 '(필수) 만 14세 이상… 동의'를 체크하지 않은 채 가입하기",
+  "'필수 항목에 체크해주세요.' 안내, 가입 안 됨",
+  async () => {
+    const p = await newUserPage(browser);
+    await openLogin(p); await toSignup(p);
+    await typeAuth(p, { email: `noagree${stamp}@example.test`, password: PW, passwordConfirm: PW, agree: false });
+    await click(p, ".auth-submit", "가입하기");
+    await wait(800);
+    const m = await msg(p);
+    const stillOnForm = await p.evaluate(() => !!document.querySelector(".auth-card"));
+    await p.browserContext().close();
+    assert(m.includes("필수 항목에 체크") && stillOnForm, m);
+    return `안내: "${m}"`;
+  });
+
+await tc("AU-23", A, "구글·카카오 첫 로그인 — 약관 동의 창",
+  "동의 기록이 없는 새 계정으로 소셜 로그인 → Esc → 체크 없이 '동의하고 시작하기' → 체크 후 '동의하고 시작하기'",
+  "닫히지 않는 동의 창(이용약관·방침 펼쳐보기), 체크 안 하면 안내, 동의하면 닉네임 창으로 이어지고 동의 기록(버전·시각) 저장",
+  async () => {
+    const uid = `social${stamp}`;
+    const p = await signInFresh(uid);
+    await waitFor(p, () => !!document.querySelector(".modal input[name=agree]"), { label: "terms dialog", timeout: 10000 });
+    const title = (await modalText(p)).split("\n")[0];
+    const folds = await p.evaluate(() => [...document.querySelectorAll(".modal details summary")].map((s) => s.innerText));
+    await p.keyboard.press("Escape"); await wait(400);
+    const survivesEsc = await agreeBox(p);
+    await p.mouse.click(5, 5); await wait(400);
+    const survivesOutside = await agreeBox(p);
+    await click(p, ".modal button", "동의하고 시작하기");
+    await wait(400);
+    const warn = await modalText(p);
+    await p.evaluate(() => document.querySelector(".modal input[name=agree]").click());
+    await click(p, ".modal button", "동의하고 시작하기");
+    await waitFor(p, () => !!document.querySelector(".modal input[name=nickname]"), { label: "nickname next", timeout: 10000 });
+    const u = await fsGet(`users/${uid}`);
+    await p.browserContext().close();
+    assert(survivesEsc && survivesOutside, "terms dialog closed without an answer");
+    assert(warn.includes("필수 항목에 체크"), warn);
+    assert(u?.termsVersion === TERMS_VERSION && u?.termsAgreedAt, JSON.stringify(u));
+    return `"${title}" 창 (${folds.join(", ")}), Esc·바깥 클릭에 안 닫힘, 미체크 시 안내 → 동의 후 닉네임 창, 기록 ${u.termsVersion}`;
+  });
+
+await tc("AU-24", A, "약관 '동의하지 않음'",
+  "동의 기록이 없는 계정으로 로그인 → '동의하지 않음'",
+  "로그아웃되고 동의 기록이 남지 않음",
+  async () => {
+    const uid = `decline${stamp}`;
+    const p = await signInFresh(uid);
+    await waitFor(p, () => !!document.querySelector(".modal input[name=agree]"), { label: "terms dialog", timeout: 10000 });
+    await click(p, ".modal button", "동의하지 않음");
+    await waitFor(p, () => !document.querySelector("header.top .top-actions-full button") || !!document.querySelector(".lp, .auth-card"), { label: "signed out", timeout: 10000 });
+    await wait(800);
+    const signedOut = await p.evaluate(() => !!document.querySelector(".lp, .auth-card"));
+    const u = await fsGet(`users/${uid}`);
+    await p.browserContext().close();
+    assert(signedOut && !u?.termsVersion, JSON.stringify({ signedOut, u }));
+    return "로그아웃되어 랜딩/로그인 화면, 동의 기록 없음";
+  });
+
+await tc("AU-25", A, "기존 가입자(동의 기록 없음) 다시 로그인",
+  "닉네임은 있고 동의 기록은 없는 계정으로 로그인 → 동의",
+  "'서비스 이용 동의' 창이 한 번 뜨고, 동의 후 닉네임 창 없이 바로 이용",
+  async () => {
+    const uid = `old${stamp}`;
+    const p = await signInFresh(uid, { nickname: "기존회원" });
+    await waitFor(p, () => !!document.querySelector(".modal input[name=agree]"), { label: "terms dialog", timeout: 10000 });
+    const title = (await modalText(p)).split("\n")[0];
+    await p.evaluate(() => document.querySelector(".modal input[name=agree]").click());
+    await click(p, ".modal button", "동의하고 시작하기");
+    await wait(1500);
+    const leftOpen = await modalOpen(p);
+    const u = await fsGet(`users/${uid}`);
+    await p.browserContext().close();
+    assert(title.includes("서비스 이용 동의") && !leftOpen && u?.nickname === "기존회원" && u?.termsVersion === TERMS_VERSION, JSON.stringify({ title, leftOpen, u }));
+    return `"${title}" → 동의 후 바로 이용 (닉네임 "${u.nickname}" 유지)`;
+  });
+
+await tc("AU-26", A, "약관 개정 후 다시 동의",
+  "예전 버전(2026-01-01)에 동의한 계정으로 로그인",
+  "'약관이 바뀌었어요' 창이 뜨고, 동의하면 새 버전으로 기록",
+  async () => {
+    const uid = `revised${stamp}`;
+    const p = await signInFresh(uid, { nickname: "개정테스트", termsVersion: "2026-01-01" });
+    await waitFor(p, () => !!document.querySelector(".modal input[name=agree]"), { label: "terms dialog", timeout: 10000 });
+    const title = (await modalText(p)).split("\n")[0];
+    await p.evaluate(() => document.querySelector(".modal input[name=agree]").click());
+    await click(p, ".modal button", "동의하고 시작하기");
+    await wait(1500);
+    const u = await fsGet(`users/${uid}`);
+    await p.browserContext().close();
+    assert(title.includes("약관이 바뀌었어요") && u?.termsVersion === TERMS_VERSION, JSON.stringify({ title, u }));
+    return `"${title}" → 동의 후 ${u.termsVersion}로 기록`;
   });
 
 await browser.close();

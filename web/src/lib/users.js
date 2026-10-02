@@ -1,6 +1,6 @@
 // Account-level nicknames, stored separately from trip documents so the same
 // nickname follows a user across every trip they're a member of.
-import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, setDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { db } from "./db";
 
 export { DEFAULT_NICKNAME, NICKNAME_MAX } from "./nickname";
@@ -49,6 +49,19 @@ export function watchNicknames(uids, onChange) {
   ));
   if (unique.every((uid) => cache.has(uid))) emit();
   return () => unsubs.forEach((u) => u());
+}
+
+/** The signed-in user's own profile: nickname and which terms version they
+ * agreed to (see lib/terms.js). */
+export async function fetchProfile(uid) {
+  const snap = await getDoc(doc(db, "users", uid));
+  const data = snap.exists() ? snap.data() : {};
+  cache.set(uid, data.nickname || "");
+  return { nickname: data.nickname || "", termsVersion: data.termsVersion || null };
+}
+
+export function agreeToTerms(uid, termsVersion) {
+  return setDoc(doc(db, "users", uid), { termsVersion, termsAgreedAt: serverTimestamp() }, { merge: true });
 }
 
 export function setNickname(uid, nickname) {

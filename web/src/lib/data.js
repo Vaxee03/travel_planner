@@ -15,6 +15,8 @@ export const setChecklistDone = lazy("setChecklistDone");
 export const setPublicShareId = lazy("setPublicShareId");
 export const fetchNickname = lazy("fetchNickname");
 export const setNickname = lazy("setNickname");
+export const fetchProfile = lazy("fetchProfile");
+export const agreeToTerms = lazy("agreeToTerms");
 
 /** Same as tripsApi.subscribeTrips (returns an unsubscribe function right
  * away), with the listener attached once the module has loaded. */

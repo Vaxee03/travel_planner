@@ -9,6 +9,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { BASE, launch, wait, waitFor, click, fsSet, isoDay } from "../e2e/h.mjs";
+import { TERMS_VERSION } from "../src/lib/terms.js";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const out = path.join(root, "store");
@@ -18,7 +19,7 @@ fs.mkdirSync(raw, { recursive: true });
 // ---- demo data -------------------------------------------------------------
 const JI = "demo_jimin", MS = "demo_minsu", SY = "demo_seoyeon";
 const MEMBERS = [JI, MS, SY];
-for (const [uid, nickname] of [[JI, "지민"], [MS, "민수"], [SY, "서연"]]) await fsSet(`users/${uid}`, { nickname });
+for (const [uid, nickname] of [[JI, "지민"], [MS, "민수"], [SY, "서연"]]) await fsSet(`users/${uid}`, { nickname, termsVersion: TERMS_VERSION });
 
 const at = (lat, lng, address) => ({ lat, lng, address });
 const OSAKA = "demoOsaka01";

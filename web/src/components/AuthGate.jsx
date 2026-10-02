@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { reportFormProblem } from "../lib/formProblem";
+import { noteAgreedAtSignup, takeAgreedAtSignup } from "../lib/terms";
 import {
   signIn, signUp, signInWithGoogle, signInWithKakao, setRememberMe, sendPasswordReset, authErrorMessage,
 } from "../lib/firebase";
@@ -64,6 +66,7 @@ export default function AuthGate({ onAuthed }) {
       const cred = await signInFn();
       onAuthed?.(cred.user);
     } catch (err) {
+      takeAgreedAtSignup(); // no account was made, so nothing was agreed
       setError(authErrorMessage(err));
     } finally {
       if (mountedRef.current) setLoading(false);
@@ -84,6 +87,7 @@ export default function AuthGate({ onAuthed }) {
       setError("비밀번호가 서로 달라요.");
       return;
     }
+    if (mode === "signup") noteAgreedAtSignup(); // recorded by App once signed in
     run(() => (mode === "signup" ? signUp(email, password) : signIn(email, password)));
   }
 
@@ -133,6 +137,12 @@ export default function AuthGate({ onAuthed }) {
           />
           {isSignup && (
             <input className="auth-input" name="passwordConfirm" type="password" placeholder="비밀번호 확인" aria-label="비밀번호 확인" required minLength={6} autoComplete="new-password" />
+          )}
+          {isSignup && (
+            <label className="terms-check auth-terms">
+              <input type="checkbox" name="agree" required />
+              <span><b>(필수)</b> 만 14세 이상이며, <Link to="/terms">이용약관</Link>에 동의합니다. 개인정보는 <Link to="/privacy">개인정보처리방침</Link>에 따라 처리돼요.</span>
+            </label>
           )}
 
           {error && <div className="note auth-msg"><span className="dot" /><span>{error}</span></div>}

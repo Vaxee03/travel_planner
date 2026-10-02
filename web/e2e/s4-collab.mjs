@@ -114,20 +114,23 @@ await tc("C-05", A1, "잘못된 참여 코드 / 이미 참여한 여행 코드 �
 
 await tc("C-06", A1, "로그아웃 상태에서 초대 링크(/join/...)로 합류",
   "서연: 로그인 안 된 브라우저로 /join/<코드> 접속 → 로그인",
-  "로그인 화면이 뜨고, 로그인하면 자동으로 그 여행에 합류해 여행 화면 표시",
+  "로그인 화면이 뜨고, 로그인하면 자동으로 그 여행에 합류해 여행 화면 표시 (새 계정은 약관 동의 → 닉네임 순)",
   async () => {
     await pc.goto(`${BASE}/join/${TRIP_ID}`, { waitUntil: "domcontentloaded" });
     await waitFor(pc, () => !!document.querySelector(".auth-card"), { label: "login shown" });
     const beforeLp = await pc.evaluate(() => !!document.querySelector(".lp"));
     await pc.evaluate((uid) => window.__emulatorSignIn(uid), C);
     await waitFor(pc, () => location.pathname === location.pathname && location.pathname.includes("/trip/"), { label: "C joined", timeout: 15000 });
-    await wait(800);
+    // A brand-new account: the terms agreement comes first, then the nickname.
+    await waitFor(pc, () => !!document.querySelector(".modal input[name=agree]"), { label: "C terms dialog", timeout: 8000 });
+    await pc.evaluate(() => document.querySelector(".modal input[name=agree]").click());
+    await click(pc, ".modal button", "동의하고 시작하기");
     await waitFor(pc, () => !!document.querySelector(".modal input[name=nickname]"), { label: "C nickname prompt", timeout: 8000 });
     await fill(pc, { nickname: "서연" }); await submitModal(pc);
     await waitFor(pc, () => !document.querySelector(".modal"), { label: "C nickname saved" });
     const t = await fsGet(`trips/${TRIP_ID}`);
     assert(!beforeLp && t.memberIds.includes(C), JSON.stringify(t.memberIds));
-    return `로그인 화면 표시 → 로그인 후 자동 합류 (동행자 ${t.memberIds.length}명)`;
+    return `로그인 화면 표시 → 로그인 후 자동 합류, 약관 동의 → 닉네임 순서 (동행자 ${t.memberIds.length}명)`;
   });
 
 await tc("C-07", A1, "동행자 기본 권한 (방장이 권한을 주기 전)",

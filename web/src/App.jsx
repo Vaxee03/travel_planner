@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Link, matchPath, useLocation, useNavigate } from "react-router-dom";
 import { firebaseReady, watchAuth, signOutUser, deleteMyAccount, callFunction } from "./lib/firebase";
-import { subscribeTrips, createTrip, mutateTrip, deleteTrip, joinTrip, removeMember, setChecklistDone, setPublicShareId, fetchNickname, setNickname } from "./lib/data";
+import { subscribeTrips, createTrip, mutateTrip, deleteTrip, joinTrip, removeMember, setChecklistDone, setPublicShareId, fetchProfile, agreeToTerms, setNickname } from "./lib/data";
 
 const JOIN_FAILED = "여행에 참여하지 못했어요. 코드가 맞는지, 방장이 참여를 막지 않았는지 확인해주세요.";
 import { NICKNAME_MAX } from "./lib/nickname";
@@ -16,6 +16,7 @@ import { isNativeApp } from "./lib/platform";
 import { useNativeShell } from "./lib/useNativeShell";
 import { addBackHandler } from "./lib/backHandlers";
 import { alertDialog } from "./lib/dialogs";
+import { TERMS_VERSION, takeAgreedAtSignup } from "./lib/terms";
 import DialogLayer from "./components/DialogLayer";
 import { reportError } from "./lib/errorReporting";
 // App only (Firestore-backed like lib/data, so loaded on demand).
@@ -161,17 +162,32 @@ export default function App() {
   // If a nickname hasn't been set yet (brand-new signup or a pre-existing
   // account from before this feature), prompt once per login — skippable,
   // since the rest of the app falls back to a default label when it's blank.
+  function promptNickname(nick) {
+    if (!nick && user && nicknamePromptedRef.current !== user.uid) {
+      nicknamePromptedRef.current = user.uid;
+      setModal({ type: "set-nickname", suggested: randomNickname() });
+    }
+  }
+
+  // After sign-in, before anything else: the terms agreement (lib/terms.js).
+  // It can't be dismissed — "동의하지 않음" signs out. Email sign-ups ticked
+  // it on the form already, so that's just recorded.
   useEffect(() => {
     if (!user) { setNicknameState(""); return; }
     let cancelled = false;
-    fetchNickname(user.uid).then((nick) => {
+    const agreedAtSignup = takeAgreedAtSignup();
+    fetchProfile(user.uid).then(async ({ nickname: nick, termsVersion }) => {
       if (cancelled) return;
       setNicknameState(nick);
-      if (!nick && nicknamePromptedRef.current !== user.uid) {
-        nicknamePromptedRef.current = user.uid;
-        setModal({ type: "set-nickname", suggested: randomNickname() });
+      if (termsVersion !== TERMS_VERSION) {
+        if (!agreedAtSignup) {
+          setModal({ type: "terms-consent", blocking: true, isUpdate: Boolean(termsVersion), askNickname: !nick });
+          return;
+        }
+        await agreeToTerms(user.uid, TERMS_VERSION).catch((err) => reportError(err, "terms-at-signup"));
       }
-    });
+      promptNickname(nick);
+    }).catch((err) => reportError(err, "profile-load"));
     return () => { cancelled = true; };
   }, [user]);
 
@@ -352,6 +368,17 @@ export default function App() {
       const { savePushPrefs } = await loadPush();
       await savePushPrefs(user.uid, { tripChanges: values.tripChanges === "on", reminders: values.reminders === "on" });
       closeModal();
+      return;
+    }
+    if (m.type === "terms-consent") {
+      if (m.decline) {
+        closeModal();
+        await handleSignOut();
+        return;
+      }
+      await agreeToTerms(user.uid, TERMS_VERSION);
+      closeModal();
+      if (m.askNickname) promptNickname("");
       return;
     }
     if (m.type === "set-nickname" || m.type === "edit-nickname") {

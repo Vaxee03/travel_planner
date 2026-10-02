@@ -7,7 +7,7 @@ import {
 } from "@firebase/rules-unit-testing";
 import {
   doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, arrayRemove, arrayUnion, deleteField,
-  collection, query, where, documentId,
+  collection, query, where, documentId, serverTimestamp, Timestamp,
 } from "firebase/firestore";
 
 const env = await initializeTestEnvironment({
@@ -109,6 +109,15 @@ test("reviews: each member can change only their own entry", async () => {
   await assertFails(updateDoc(doc(db("alice"), "trips/t1"), { "reviewsBy.alice": { text: "", photos: photos(31), updatedAt: 5 } }));
   // the old shared array is read-only, even for the 방장
   await assertFails(updateDoc(doc(db("owner"), "trips/t1"), { reviews: [] }));
+});
+
+test("users: terms agreement is recorded with the server's time", async () => {
+  const me = doc(db("alice"), "users/alice");
+  await assertSucceeds(setDoc(me, { termsVersion: "2026-10-03", termsAgreedAt: serverTimestamp() }, { merge: true }));
+  await assertSucceeds(setDoc(me, { nickname: "앨리스" }, { merge: true })); // later edits keep the old time
+  await assertFails(setDoc(me, { termsAgreedAt: Timestamp.fromMillis(1) }, { merge: true })); // no backdating
+  await assertFails(setDoc(me, { termsVersion: "x".repeat(21) }, { merge: true }));
+  await assertFails(setDoc(doc(db("bob"), "users/alice"), { termsVersion: "2026-10-03", termsAgreedAt: serverTimestamp() }, { merge: true }));
 });
 
 test("users: look up one nickname, never list them all", async () => {
