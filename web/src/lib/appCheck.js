@@ -17,13 +17,17 @@ import { isNativeApp } from "./platform";
 
 export function startAppCheck(app) {
   if (isNativeApp) {
-    const plugin = import("@capacitor-firebase/app-check").then(async ({ FirebaseAppCheck }) => {
+    // Resolves to a wrapper, never the plugin itself: a Capacitor plugin is a
+    // proxy that answers any method name, so a promise resolving to it would
+    // call its (missing) native "then".
+    const ready = import("@capacitor-firebase/app-check").then(async ({ FirebaseAppCheck }) => {
       await FirebaseAppCheck.initialize({ debugToken: Boolean(window.Capacitor?.DEBUG), isTokenAutoRefreshEnabled: true });
-      return FirebaseAppCheck;
+      return { plugin: FirebaseAppCheck };
     });
     const provider = new CustomProvider({
       getToken: async () => {
-        const { token, expireTimeMillis } = await (await plugin).getToken();
+        const { plugin } = await ready;
+        const { token, expireTimeMillis } = await plugin.getToken();
         return { token, expireTimeMillis };
       },
     });
