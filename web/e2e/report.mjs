@@ -1,10 +1,8 @@
 // Builds the test-result document (HTML) from results.json.
 import fs from "node:fs";
 
-// results.json can hold both suites' cases (web run, then the phone suite
-// on top); each document shows only its own.
-const results = JSON.parse(fs.readFileSync(new URL("./results.json", import.meta.url), "utf8"))
-  .filter((r) => (process.argv[3] === "mobile") === r.id.startsWith("M-"));
+// The phone suite (e2e/m1-android.mjs) writes its own file, see h.mjs.
+const results = JSON.parse(fs.readFileSync(new URL(process.argv[3] === "mobile" ? "./results-mobile.json" : "./results.json", import.meta.url), "utf8"));
 const out = process.argv[2];
 const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 

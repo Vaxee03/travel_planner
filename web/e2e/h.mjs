@@ -7,7 +7,9 @@ export const BASE = "http://localhost:5173";
 export const HOSTING = "http://127.0.0.1:5000";
 export const PROJECT = "travel-planner-bb32d";
 export const FS = `http://127.0.0.1:8080/v1/projects/${PROJECT}/databases/travelplanner/documents`;
-export const RESULTS = new URL("./results.json", import.meta.url);
+// The phone suite keeps its own file: both suites number some cases "M-..."
+// (web: 동행자 관리, phone: mobile), which would overwrite each other.
+export const RESULTS = new URL(/m1-android/.test(process.argv[1] || "") ? "./results-mobile.json" : "./results.json", import.meta.url);
 export const SHOTS = new URL("./shots/", import.meta.url);
 fs.mkdirSync(SHOTS, { recursive: true });
 
