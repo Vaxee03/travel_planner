@@ -20,7 +20,7 @@ export default function RouteMapViewer({ day, onClose }) {
 
   return (
     <div>
-      <h3>🗺 동선 보기</h3>
+      <h3>🗺️ 동선 보기</h3>
       {!apiKey || loadError ? (
         <div className="note"><span className="dot" /><span>지도를 불러오지 못했어요.</span></div>
       ) : !isLoaded ? (

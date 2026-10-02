@@ -287,7 +287,7 @@ function DayDetail({ trip, idx, setDayIdx, openModal, requestDelete, reorderDayI
       <div className="detail-sub">{d.summary || "세부 계획 미정"}</div>
       {routeStops(d).length > 0 && (
         <div className="btn-row" style={{ marginBottom: 12 }}>
-          <button className="btn btn-sm" onClick={() => openModal({ type: "view-route", dayIdx: idx })}>🗺 동선 보기</button>
+          <button className="btn btn-sm" onClick={() => openModal({ type: "view-route", dayIdx: idx })}>🗺️ 동선 보기</button>
         </div>
       )}
 

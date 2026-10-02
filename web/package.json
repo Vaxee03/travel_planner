@@ -13,7 +13,8 @@
     "build:native": "vite build --mode native && npm run cap -- sync android",
     "cap": "npx -y -p node@22 node node_modules/@capacitor/cli/bin/capacitor",
     "icons": "node scripts/make-icons.mjs",
-    "og": "node scripts/make-og.mjs"
+    "og": "node scripts/make-og.mjs",
+    "store": "node scripts/make-store.mjs"
   },
   "dependencies": {
     "@capacitor-firebase/app-check": "^8.5.2",

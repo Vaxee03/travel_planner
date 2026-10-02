@@ -71,7 +71,7 @@ export default function TripDetail({ trip, uid, perms, tab, setTab, dayIdx, setD
           )}
         </div>
         <div className="btn-row trip-actions" ref={actionsRef}>
-          <button className="btn btn-sm" onClick={() => openModal({ type: "invite" })}>🎟 동행자 초대</button>
+          <button className="btn btn-sm" onClick={() => openModal({ type: "invite" })}>🎟️ 동행자 초대</button>
           <button className="btn btn-sm" onClick={confirmIcsExport}>📅 캘린더로 내보내기</button>
           <button className="btn btn-sm" onClick={() => openModal({ type: "duplicate-trip" })}>📋 여행 복제</button>
           {perms.isOwner && (
