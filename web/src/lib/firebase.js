@@ -85,7 +85,7 @@ let storageModule;
 export function loadStorage() {
   storageModule ||= import("firebase/storage").then((m) => {
     const instance = m.getStorage(app);
-    if (useEmulators) m.connectStorageEmulator(instance, "127.0.0.1", 9199);
+    if (useEmulators) m.connectStorageEmulator(instance, "127.0.0.1", 9399); // not 9199: Windows often reserves 9102-9201
     return { ...m, instance };
   });
   return storageModule;

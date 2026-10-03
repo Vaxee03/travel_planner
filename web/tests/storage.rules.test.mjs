@@ -8,7 +8,7 @@ import { ref, uploadString, getMetadata, deleteObject } from "firebase/storage";
 const env = await initializeTestEnvironment({
   projectId: "travel-planner-bb32d",
   firestore: { rules: readFileSync("firestore.rules", "utf8"), host: "127.0.0.1", port: 8080 },
-  storage: { rules: readFileSync("storage.rules", "utf8"), host: "127.0.0.1", port: 9199 },
+  storage: { rules: readFileSync("storage.rules", "utf8"), host: "127.0.0.1", port: 9399 },
 });
 after(() => env.cleanup());
 

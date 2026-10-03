@@ -312,8 +312,8 @@ await tc("V-05", A3, "사진 삭제 / 후기 삭제",
     const path = before.reviewsBy[O].photos[0].path;
     await po.evaluate(() => document.querySelector(".photo-del").click());
     await wait(1500);
-    const exists = await fetch(`http://127.0.0.1:9199/v0/b/${PROJECT}.appspot.com/o/${encodeURIComponent(path)}`, { headers: { Authorization: "Bearer owner" } }).then((r) => r.status).catch(() => 0);
-    const exists2 = await fetch(`http://127.0.0.1:9199/v0/b/${PROJECT}.firebasestorage.app/o/${encodeURIComponent(path)}`, { headers: { Authorization: "Bearer owner" } }).then((r) => r.status).catch(() => 0);
+    const exists = await fetch(`http://127.0.0.1:9399/v0/b/${PROJECT}.appspot.com/o/${encodeURIComponent(path)}`, { headers: { Authorization: "Bearer owner" } }).then((r) => r.status).catch(() => 0);
+    const exists2 = await fetch(`http://127.0.0.1:9399/v0/b/${PROJECT}.firebasestorage.app/o/${encodeURIComponent(path)}`, { headers: { Authorization: "Bearer owner" } }).then((r) => r.status).catch(() => 0);
     await click(po, ".card button", "삭제", { exact: true });
     await click(po, ".modal button", "삭제", { exact: true });
     await wait(1200);
