@@ -124,7 +124,16 @@ export async function fill(page, values, scope = ".modal") {
       const els = [...root.querySelectorAll(`[name="${name}"]`)];
       if (!els.length) { miss.push(name); continue; }
       const el = els[0];
-      if (el.type === "radio") {
+      if (el.type === "hidden" && el.closest(".time-select")) {
+        // TimeSelect: "HH:MM" goes into its 오전/오후 · 시 · 분 dropdowns.
+        const [h, m] = value.split(":").map(Number);
+        const box = el.closest(".time-select");
+        for (const [part, v] of [["half", h < 12 ? "am" : "pm"], ["hour", h % 12 || 12], ["minute", m]]) {
+          const sel = box.querySelector(`select[data-part=${part}]`);
+          Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(sel, String(v));
+          sel.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+      } else if (el.type === "radio") {
         const r = els.find((e) => e.value === value);
         if (!r) { miss.push(name + "=" + value); continue; }
         r.click();
@@ -169,6 +178,17 @@ export async function answerDialog(page, ok = true, { timeout = 5000 } = {}) {
     await wait(120);
   }
   return null;
+}
+/** The invite card (JoinInvite.jsx): waits for it and returns its text;
+ * with `join`, presses 참여하기 and waits until the trip opens. */
+export async function inviteCard(page, { join = false, timeout = 10000 } = {}) {
+  await waitFor(page, () => !!document.querySelector(".invite-card .invite-actions, .invite-card[role=alert]"), { label: "invite card", timeout });
+  const text = await page.evaluate(() => document.querySelector(".invite-card").innerText);
+  if (join) {
+    await click(page, ".invite-card button", "참여하기", { exact: true });
+    await waitFor(page, () => location.pathname.includes("/trip/"), { label: "joined", timeout });
+  }
+  return text;
 }
 export const modalOpen = (page) => page.evaluate(() => !!document.querySelector(".modal"));
 export const modalText = (page) => page.evaluate(() => [...document.querySelectorAll(".modal")].pop()?.innerText || "");

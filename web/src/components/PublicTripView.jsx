@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchPublicTrip } from "../lib/tripsApi";
-import { fmtDate, splitItems } from "../lib/utils";
+import { fmtDate, splitItems, fmtTime } from "../lib/utils";
 
 /** /share/:shareId — the read-only itinerary a 방장 shared publicly. Works
  * signed out; shows only what the getPublicTrip function returns. */
@@ -62,7 +62,7 @@ export default function PublicTripView({ shareId }) {
                   <ul className="plan-list">
                     {entries.map(({ it, idx }) => (
                       <li key={idx}>
-                        <span className="plan-time">{it.time || ""}</span>
+                        <span className="plan-time">{fmtTime(it.time)}</span>
                         <span className="plan-text">
                           {it.text}{" "}
                           {it.location && (

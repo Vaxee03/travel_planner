@@ -179,6 +179,28 @@ export function itemKind(it) {
   return /^\d{1,2}:\d{2}$/.test(it.time || "") ? "time" : "label";
 }
 
+/** "14:30" → "오후 2:30", "00:15" → "오전 12:15". Anything that isn't a
+ * time (a text item's label like "식사") comes back unchanged. Times are
+ * stored as 24-hour "HH:MM", which is what sorting and .ics export use. */
+export function fmtTime(t) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(t || "");
+  if (!m) return t || "";
+  const h = Number(m[1]);
+  return `${h < 12 ? "오전" : "오후"} ${h % 12 || 12}:${m[2]}`;
+}
+
+/** The time a new item on this day probably starts: an hour after the
+ * day's latest timed item, or 09:00 on a day with none yet. */
+export function nextItemTime(items) {
+  const times = (items || [])
+    .filter((it) => itemKind(it) === "time" && /^\d{1,2}:\d{2}$/.test(it.time))
+    .map((it) => it.time.padStart(5, "0"))
+    .sort();
+  if (!times.length) return "09:00";
+  const [h, m] = times[times.length - 1].split(":").map(Number);
+  return `${String(Math.min(h + 1, 23)).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
 export function splitItems(items) {
   const timeEntries = [];
   const labelEntries = [];

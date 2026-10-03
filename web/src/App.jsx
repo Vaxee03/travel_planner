@@ -3,7 +3,6 @@ import { Link, matchPath, useLocation, useNavigate } from "react-router-dom";
 import { firebaseReady, watchAuth, signOutUser, deleteMyAccount, callFunction } from "./lib/firebase";
 import { subscribeTrips, createTrip, mutateTrip, deleteTrip, joinTrip, removeMember, setChecklistDone, setPublicShareId, fetchProfile, agreeToTerms, setNickname } from "./lib/data";
 
-const JOIN_FAILED = "여행에 참여하지 못했어요. 코드가 맞는지, 방장이 참여를 막지 않았는지 확인해주세요.";
 import { NICKNAME_MAX } from "./lib/nickname";
 import { randomNickname } from "./lib/randomNickname";
 import {
@@ -18,6 +17,7 @@ import { addBackHandler } from "./lib/backHandlers";
 import { alertDialog } from "./lib/dialogs";
 import { TERMS_VERSION, takeAgreedAtSignup } from "./lib/terms";
 import DialogLayer from "./components/DialogLayer";
+import JoinInvite from "./components/JoinInvite";
 import { reportError } from "./lib/errorReporting";
 // App only (Firestore-backed like lib/data, so loaded on demand).
 const loadPush = () => import("./lib/push");
@@ -146,18 +146,15 @@ export default function App() {
   // resets whenever a different trip is opened.
   useEffect(() => { setDayIdx(null); }, [tripId]);
 
-  // Consume an invite link — /join/<tripId>, or the older ?join=<tripId> form
-  // that already-shared invite cards still point at — then open that trip.
+  // An invite link — /join/<tripId>, or the older ?join=<tripId> form that
+  // already-shared invite cards still point at — or a typed join code opens
+  // the invite card (components/JoinInvite.jsx), which asks before joining.
   const joinId = joinMatch?.params.tripId || new URLSearchParams(location.search).get("join");
-  useEffect(() => {
-    if (!user || !joinId) return;
-    joinTrip(joinId, user.uid)
-      .then(() => {
-        notifyTripChange(joinId, "member");
-        navigate(`/trip/${joinId}/itinerary`, { replace: true });
-      })
-      .catch(() => { setFlash(JOIN_FAILED); navigate("/", { replace: true }); });
-  }, [user, joinId, navigate]);
+  async function acceptInvite() {
+    await joinTrip(joinId, user.uid);
+    notifyTripChange(joinId, "member");
+    navigate(`/trip/${joinId}/itinerary`, { replace: true });
+  }
 
   // If a nickname hasn't been set yet (brand-new signup or a pre-existing
   // account from before this feature), prompt once per login — skippable,
@@ -255,9 +252,8 @@ export default function App() {
     setModal({ type: "confirm", onYes, message, ...extra, tripAtOpen: trip });
   }
 
-  async function handleJoinByCode(code) {
-    await joinTrip(code, user.uid);
-    openTrip(code);
+  function handleJoinByCode(code) {
+    navigate(`/join/${encodeURIComponent(code)}`);
   }
 
   // A targeted single-field update rather than a mutateTrip transaction, so
@@ -700,7 +696,12 @@ export default function App() {
       ) : !tripsReady ? (
         <div className="empty">저장 기능을 불러오는 중이에요…</div>
       ) : joinId ? (
-        <div className="empty">초대받은 여행에 참여하는 중이에요…</div>
+        <JoinInvite
+          tripId={joinId}
+          onJoin={acceptInvite}
+          onOpen={() => navigate(`/trip/${joinId}/itinerary`, { replace: true })}
+          onClose={() => navigate("/", { replace: true })}
+        />
       ) : !tripId ? (
         <Home trips={trips} onOpenTrip={openTrip} onAddTrip={() => openModal({ type: "add-trip" })} onJoinByCode={handleJoinByCode} />
       ) : trip ? (

@@ -1,6 +1,6 @@
 import { GoogleMap, Marker, Polyline, useJsApiLoader } from "@react-google-maps/api";
 import { MAPS_LOADER_OPTIONS } from "../lib/mapsLoader";
-import { routeStops } from "../lib/utils";
+import { routeStops, fmtTime } from "../lib/utils";
 
 const MAP_OPTIONS = { disableDefaultUI: true, zoomControl: true, gestureHandling: "greedy" };
 
@@ -46,7 +46,7 @@ export default function RouteMapViewer({ day, onClose }) {
       <ol className="route-stops">
         {stops.map((it, i) => (
           <li key={i}>
-            <b>{i + 1}</b> {it.time ? <span className="nums">{it.time} · </span> : null}{it.text}
+            <b>{i + 1}</b> {it.time ? <span className="nums">{fmtTime(it.time)} · </span> : null}{it.text}
           </li>
         ))}
       </ol>

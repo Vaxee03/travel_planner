@@ -213,7 +213,7 @@ section{ margin-bottom:44px; }
 .card{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:20px 22px; }
 .plan-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px; }
 .plan-list li{ display:flex; gap:12px; align-items:flex-start; font-size:16px; }
-.plan-time{ flex:0 0 auto; color:var(--accent); font-weight:700; font-size:14.5px; padding-top:2px; min-width:56px; }
+.plan-time{ flex:0 0 auto; color:var(--accent); font-weight:700; font-size:14.5px; padding-top:2px; min-width:74px; white-space:nowrap; }
 .plan-text{ flex:1 1 auto; }
 .plan-actions{ flex:0 0 auto; display:flex; gap:2px; }
 .drag-handle{ flex:0 0 auto; cursor:grab; color:var(--ink-soft); font-size:18px; line-height:1; padding:2px 4px; touch-action:none; user-select:none; }
@@ -309,6 +309,24 @@ footer.app-footer .footer-links a, footer.app-footer .footer-links .btn-ghost{ c
 .terms-check input{ width:20px; height:20px; margin:1px 0 0; flex:none; accent-color:var(--accent); }
 .terms-hint{ margin:0; color:var(--ink-soft); font-size:12.5px; word-break:keep-all; }
 .auth-terms{ margin:4px 0 2px; font-size:13.5px; }
+
+/* Item time: 오전/오후 · 시 · 분 dropdowns (Modals.jsx TimeSelect). */
+.time-select{ display:flex; align-items:center; gap:6px; }
+.time-select select{ width:auto; flex:0 0 auto; min-width:68px; }
+.time-select span{ color:var(--ink-soft); font-size:14px; }
+
+/* Invite card (JoinInvite.jsx): an invite link or join code, before joining. */
+.invite-page{ display:flex; justify-content:center; padding:28px 0 40px; }
+.invite-card{ width:100%; max-width:420px; background:var(--surface); border:1px solid var(--line); border-radius:20px; padding:30px 26px 24px; text-align:center; box-shadow:0 14px 40px rgba(0,0,0,.12); word-break:keep-all; }
+.invite-emoji{ width:64px; height:64px; margin:0 auto 14px; border-radius:18px; background:var(--accent-soft); display:flex; align-items:center; justify-content:center; font-size:32px; }
+.invite-kicker{ margin:0 0 6px; color:var(--ink-soft); font-size:14px; }
+.invite-title{ margin:0 0 16px; font-size:24px; line-height:1.3; overflow-wrap:anywhere; }
+.invite-sub{ margin:0 0 4px; color:var(--ink-soft); font-size:14px; line-height:1.6; }
+.invite-facts{ list-style:none; margin:0 auto 4px; padding:14px 16px; background:var(--bg); border-radius:12px; text-align:left; display:flex; flex-direction:column; gap:8px; font-size:14.5px; }
+.invite-names{ color:var(--ink-soft); font-size:13px; }
+.invite-error{ margin:12px 0 0; color:var(--danger); font-size:13.5px; }
+.invite-actions{ display:flex; gap:10px; margin-top:20px; }
+.invite-actions .btn{ flex:1; justify-content:center; padding-top:11px; padding-bottom:11px; }
 .auth-terms a{ color:var(--accent); }
 
 /* ---- Map picker (new) ---- */

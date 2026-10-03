@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import { useJsApiLoader } from "@react-google-maps/api";
 import { reportFormProblem } from "../lib/formProblem";
 import { unblockMember } from "../lib/tripsApi";
-import { fmtDate, itemKind, FormError, datesInRange, reviewPosts } from "../lib/utils";
+import { fmtDate, itemKind, nextItemTime, FormError, datesInRange, reviewPosts } from "../lib/utils";
 import { MAPS_LOADER_OPTIONS } from "../lib/mapsLoader";
 import { fetchCitySuggestions, findPlaceLocation, INTERNATIONAL_REGION_CODES } from "../lib/placeSearch";
 import { EXTRA_INTERNATIONAL_DESTINATIONS } from "../lib/extraDestinations";
@@ -26,6 +26,39 @@ function Field({ name, label, type = "text", placeholder, required, defaultValue
     <div className="field">
       <label>{label}</label>
       <input name={name} type={type} placeholder={placeholder} required={required} defaultValue={defaultValue} min={min} maxLength={maxLength} />
+    </div>
+  );
+}
+
+/** A time as three dropdowns — 오전/오후 · 시 · 분 — instead of the phone's
+ * clock-dial picker, behind one hidden 24-hour "HH:MM" field (`name`).
+ * Minutes go in fives, plus the stored minute if it isn't one, so an older
+ * 10:37 stays 10:37. */
+function TimeSelect({ name, label, defaultValue }) {
+  const [h0, m0] = (/^\d{1,2}:\d{2}$/.test(defaultValue || "") ? defaultValue : "09:00").split(":").map(Number);
+  const [half, setHalf] = useState(h0 < 12 ? "am" : "pm");
+  const [hour, setHour] = useState(h0 % 12 || 12);
+  const [minute, setMinute] = useState(m0);
+  const minutes = [...new Set([...Array.from({ length: 12 }, (_, i) => i * 5), m0])].sort((a, b) => a - b);
+  const value = `${String((hour % 12) + (half === "pm" ? 12 : 0)).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  return (
+    <div className="field">
+      <label>{label}</label>
+      <div className="time-select">
+        <select aria-label="오전/오후" data-part="half" value={half} onChange={(e) => setHalf(e.target.value)}>
+          <option value="am">오전</option>
+          <option value="pm">오후</option>
+        </select>
+        <select aria-label="시" data-part="hour" value={hour} onChange={(e) => setHour(Number(e.target.value))}>
+          {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => <option key={h} value={h}>{h}</option>)}
+        </select>
+        <span>시</span>
+        <select aria-label="분" data-part="minute" value={minute} onChange={(e) => setMinute(Number(e.target.value))}>
+          {minutes.map((m) => <option key={m} value={m}>{String(m).padStart(2, "0")}</option>)}
+        </select>
+        <span>분</span>
+        <input type="hidden" name={name} value={value} />
+      </div>
     </div>
   );
 }
@@ -501,7 +534,8 @@ export default function ModalHost({ modal, trip, trips, uid, onClose, onSubmit: 
   } else if (modal.type === "add-item" || modal.type === "edit-item") {
     const isEdit = modal.type === "edit-item";
     const it = isEdit ? seenTrip.days[modal.dayIdx].items[modal.idx] : { time: "", text: "" };
-    content = <ItemForm isEdit={isEdit} it={it} destination={trip.destination} onSubmit={handleSubmit} onClose={onClose} saveError={formError} />;
+    const defaultTime = nextItemTime(seenTrip.days[modal.dayIdx]?.items);
+    content = <ItemForm isEdit={isEdit} it={it} defaultTime={defaultTime} destination={trip.destination} onSubmit={handleSubmit} onClose={onClose} saveError={formError} />;
   } else if (modal.type === "add-budget" || modal.type === "edit-budget") {
     const isEdit = modal.type === "edit-budget";
     const b = isEdit ? seenTrip.budgetItems[modal.idx] : { category: "", amount: "", memo: "" };
@@ -1047,7 +1081,7 @@ function RestaurantItemForm({ trip, restaurant, onSubmit, onClose, saveError }) 
   );
 }
 
-function ItemForm({ isEdit, it, prefilled, title, notice, dayOptions, destination, onSubmit, onClose, saveError }) {
+function ItemForm({ isEdit, it, prefilled, title, notice, dayOptions, defaultTime, destination, onSubmit, onClose, saveError }) {
   const initialKind = isEdit || prefilled ? itemKind(it) : "time";
   const [kind, setKind] = useState(initialKind);
   const [error, setError] = useState(null);
@@ -1089,7 +1123,7 @@ function ItemForm({ isEdit, it, prefilled, title, notice, dayOptions, destinatio
         </div>
       </div>
       {kind === "time" ? (
-        <Field name="timeValue" label="시간" type="time" defaultValue={initialKind === "time" ? it.time : ""} />
+        <TimeSelect name="timeValue" label="시간" defaultValue={(initialKind === "time" && it.time) || defaultTime || nextItemTime(dayOptions?.[0]?.items)} />
       ) : (
         <Field name="labelValue" label="구분 텍스트" placeholder="예: 이동, 식사, 귀국" defaultValue={initialKind === "label" ? it.time : ""} />
       )}

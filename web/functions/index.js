@@ -327,6 +327,38 @@ ${preferences ? `사용자가 원하는 조건: "${preferences}". 이 조건에 
   }
 });
 
+// ---- Invite card --------------------------------------------------------------
+// What someone who opened an invite link (or typed a join code) sees before
+// joining — src/components/JoinInvite.jsx. Non-members can't read a trip
+// under the security rules, so this hands out just enough to recognise it:
+// title, place, dates, who's in it. Never the itinerary, budget or bookings.
+// The trip ID is the invite code, so anyone holding it could join anyway.
+exports.getInvitePreview = onCall({ enforceAppCheck: APP_CHECK_ENFORCED, region: "asia-northeast3" }, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "로그인이 필요해요.");
+  const tripId = String(request.data?.tripId || "").trim();
+  if (!/^[A-Za-z0-9]{10,40}$/.test(tripId)) return { status: "not-found" };
+  const snap = await db.doc(`trips/${tripId}`).get();
+  if (!snap.exists) return { status: "not-found" };
+  const t = snap.data();
+  if ((t.blockedIds || []).includes(uid)) return { status: "blocked", title: t.title || "" };
+  const memberIds = t.memberIds || [];
+  const others = memberIds.filter((id) => id !== t.ownerId);
+  const shown = [t.ownerId, ...others.slice(0, 5)].filter(Boolean);
+  const users = await db.getAll(...shown.map((id) => db.doc(`users/${id}`)));
+  const nick = Object.fromEntries(users.map((u) => [u.id, (u.exists && u.data().nickname) || ""]));
+  return {
+    status: memberIds.includes(uid) ? "member" : "ok",
+    title: t.title || "",
+    destination: t.destination || "",
+    startDate: t.startDate || "",
+    endDate: t.endDate || "",
+    ownerNickname: nick[t.ownerId] || "",
+    memberCount: memberIds.length,
+    memberNicknames: others.slice(0, 5).map((id) => nick[id] || ""),
+  };
+});
+
 // ---- Kakao sign-in for the Android/iOS app ----------------------------------
 // The website signs in with Kakao through Firebase's own popup flow. In the
 // app that flow breaks: Kakao's mobile login hops out to the KakaoTalk app

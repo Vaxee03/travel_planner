@@ -6,7 +6,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import puppeteer from "puppeteer-core";
-import { tc, assert, wait, waitFor, click, fill, submitModal, modalOpen, answerDialog, isoDay } from "./h.mjs";
+import { tc, assert, wait, waitFor, click, fill, submitModal, modalOpen, answerDialog, inviteCard, isoDay } from "./h.mjs";
 
 const ADB = "C:/Users/bjsmo/AppData/Local/Android/Sdk/platform-tools/adb.exe";
 const PKG = "kr.tripplanner.app";
@@ -238,17 +238,19 @@ await tc("M-09", A3, "뒤로가기 버튼 — 열린 날짜 → 여행 → 목�
 
 await tc("M-10", A4, "초대 링크로 앱 열기 (App Links)",
   "앱이 꺼진 상태에서 https://tripplanner.kr/join/<여행ID> 링크 열기",
-  "브라우저가 아니라 앱이 열리고 해당 여행 화면으로 이동",
+  "브라우저가 아니라 앱이 열리고 초대 카드가 뜸 (내 여행이라 '이미 참여 중' → '여행 열기'로 이동)",
   async () => {
     const verified = /tripplanner\.kr: verified/.test(adb("shell", "pm", "get-app-links", PKG));
     adb("shell", "am", "start", "-a", "android.intent.action.VIEW", "-d", `https://tripplanner.kr/join/${tripId}`);
     await wait(1500);
     assert(inApp(), "opened in " + topActivity());
     await connect();
-    await waitFor(p, (id) => location.pathname === `/trip/${id}/itinerary`, { label: "trip via link", timeout: 15000 }).catch(() => {});
+    const card = await inviteCard(p, { timeout: 15000 });
+    await click(p, ".invite-card button", "여행 열기");
+    await waitFor(p, () => location.pathname.endsWith("/itinerary"), { label: "trip via link", timeout: 15000 }).catch(() => {});
     const at = await path();
-    assert(at === `/trip/${tripId}/itinerary`, at);
-    return `도메인 확인 ${verified ? "완료(verified)" : "안 됨"} → 앱에서 ${at} 열림`;
+    assert(card.includes("이미 참여 중") && at === `/trip/${tripId}/itinerary`, card + " / " + at);
+    return `도메인 확인 ${verified ? "완료(verified)" : "안 됨"} → 앱에서 초대 카드("이미 참여 중인 여행이에요") → 여행 열기 → ${at}`;
   });
 
 await tc("M-11", A4, "없는 공개 링크로 앱 열기",

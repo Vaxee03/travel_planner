@@ -5,6 +5,7 @@ import {
   useMotionValue, useMotionValueEvent, useReducedMotion, useScroll, useSpring,
 } from "motion/react";
 import "../styles/landing.css";
+import { fmtTime } from "../lib/utils";
 
 // ---------------------------------------------------------------------------
 // Small building blocks
@@ -205,7 +206,7 @@ function CollabDemo() {
               exit={{ opacity: 0, transition: { duration: 0.3 } }}
               transition={{ duration: 0.45, ease: EASE }}
             >
-              <span className="lp-tl-time nums">{item.time}</span>
+              <span className="lp-tl-time nums">{fmtTime(item.time)}</span>
               <span className="lp-tl-text">{item.text}</span>
               <span className="lp-tl-bar" style={{ background: PEOPLE[item.who] }} />
             </motion.div>

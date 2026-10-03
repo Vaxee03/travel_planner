@@ -4,23 +4,14 @@ import { tripStatus, statusLabel, ddayLabel, fmtMoney } from "../lib/utils";
 export default function Home({ trips, onOpenTrip, onAddTrip, onJoinByCode }) {
   const sorted = [...trips].sort((a, b) => (a.startDate || "").localeCompare(b.startDate || ""));
   const [code, setCode] = useState("");
-  const [joining, setJoining] = useState(false);
-  const [error, setError] = useState(null);
 
-  async function handleJoin(e) {
+  // Opens the invite card for the code (or a whole pasted invite link).
+  function handleJoin(e) {
     e.preventDefault();
     const trimmed = code.trim();
     if (!trimmed) return;
-    setJoining(true);
-    setError(null);
-    try {
-      await onJoinByCode(trimmed);
-      setCode("");
-    } catch {
-      setError("코드를 찾을 수 없거나 참여할 수 없는 여행이에요. 코드를 확인하거나 방장에게 문의해주세요.");
-    } finally {
-      setJoining(false);
-    }
+    onJoinByCode(trimmed.match(/\/join\/([A-Za-z0-9]+)/)?.[1] || trimmed);
+    setCode("");
   }
 
   return (
@@ -32,10 +23,7 @@ export default function Home({ trips, onOpenTrip, onAddTrip, onJoinByCode }) {
           value={code}
           onChange={(e) => setCode(e.target.value)}
         />
-        <button className="btn btn-sm" type="submit" disabled={joining || !code.trim()}>
-          {joining ? "참여하는 중…" : "코드로 참여하기"}
-        </button>
-        {error && <span className="section-note" style={{ color: "var(--danger)" }}>{error}</span>}
+        <button className="btn btn-sm" type="submit" disabled={!code.trim()}>코드로 참여하기</button>
       </form>
 
       <div className="section-head">

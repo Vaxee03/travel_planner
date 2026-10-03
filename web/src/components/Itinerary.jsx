@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { fmtDate, mapUrl, outsideTrip, routeStops, splitItems, stableStringify } from "../lib/utils";
+import { fmtDate, mapUrl, outsideTrip, routeStops, splitItems, stableStringify, fmtTime } from "../lib/utils";
 import { mutateTrip } from "../lib/tripsApi";
 
 export default function Itinerary({ trip, dayIdx, setDayIdx, openModal, requestDelete, reorderDayItems, canEdit }) {
@@ -128,7 +128,7 @@ function ItemBody({ trip, entry, dayIdx, openModal, requestDelete, canEdit }) {
   const it = entry.it;
   return (
     <>
-      <span className="plan-time">{it.time || ""}</span>
+      <span className="plan-time">{fmtTime(it.time)}</span>
       <span className="plan-text">
         {it.text}{" "}
         {it.location ? (

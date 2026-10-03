@@ -230,7 +230,7 @@ await p.evaluate(() => document.querySelectorAll(".day-summary")[0].click());
 
 await tc("T-13", A, "시간 항목 추가 — 시간순 자동 정렬",
   "첫째 날에 15:00 '오사카성', 09:30 '호텔 조식', 12:00 '구로몬 시장; 점심, 타코야키' 순서로 추가",
-  "타임라인이 09:30 → 12:00 → 15:00 순서로 표시",
+  "타임라인이 오전 9:30 → 오후 12:00 → 오후 3:00 순서로 표시 (오전/오후 표기)",
   async () => {
     for (const [time, t] of [["15:00", "오사카성"], ["09:30", "호텔 조식"], ["12:00", "구로몬 시장; 점심, 타코야키"]]) {
       await click(p, "button", "+ 항목 추가");
@@ -239,8 +239,29 @@ await tc("T-13", A, "시간 항목 추가 — 시간순 자동 정렬",
       await waitFor(p, () => !document.querySelector(".modal"), { label: "item saved" });
     }
     const times = await p.evaluate(() => [...document.querySelectorAll(".card")[0].querySelectorAll(".plan-time")].map((e) => e.innerText));
-    assert(times.join(",") === "09:30,12:00,15:00", times.join(","));
+    assert(times.join(",") === "오전 9:30,오후 12:00,오후 3:00", times.join(","));
     return times.join(" → ");
+  });
+
+await tc("T-13b", A, "시간 선택 — 오전/오후 드롭다운과 기본값",
+  "같은 날 '+ 항목 추가'를 열어 시간 칸 확인 → 오후 3:00 항목 '수정'을 열어 확인",
+  "오전/오후·시·분 드롭다운, 새 항목은 마지막 일정(오후 3:00) + 1시간 = 오후 4:00, 수정 창은 저장된 시간",
+  async () => {
+    const read = () => p.evaluate(() => {
+      const box = document.querySelector(".modal .time-select");
+      const pick = (part) => { const s = box.querySelector(`select[data-part=${part}]`); return s.options[s.selectedIndex].text; };
+      return { shown: `${pick("half")} ${pick("hour")}:${pick("minute")}`, stored: box.querySelector("input[type=hidden]").value, native: !!document.querySelector(".modal input[type=time]") };
+    });
+    await click(p, "button", "+ 항목 추가");
+    await waitFor(p, () => !!document.querySelector(".modal .time-select"), { label: "time select" });
+    const add = await read();
+    await click(p, ".modal button", "취소", { exact: true });
+    await p.evaluate(() => { const row = [...document.querySelectorAll(".card")[0].querySelectorAll("li")].find((li) => li.innerText.includes("오사카성")); [...row.querySelectorAll("button")].find((b) => b.innerText === "수정").click(); });
+    await waitFor(p, () => !!document.querySelector(".modal .time-select"), { label: "edit time select" });
+    const edit = await read();
+    await click(p, ".modal button", "취소", { exact: true });
+    assert(!add.native && add.shown === "오후 4:00" && add.stored === "16:00" && edit.shown === "오후 3:00" && edit.stored === "15:00", JSON.stringify({ add, edit }));
+    return `새 항목 기본값 ${add.shown}(${add.stored}), 수정 창 ${edit.shown}(${edit.stored}), 휴대폰 시계 선택기 대신 드롭다운`;
   });
 
 await tc("T-14", A, "항목 추가 — 내용 비움",

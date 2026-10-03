@@ -1,6 +1,6 @@
 // Suite 4 — invite / join / permissions / realtime / budget & settlement /
 // checklist / bookings / member management. Three users in separate profiles.
-import { BASE, launch, newUserPage, tc, assert, wait, waitFor, text, click, fill, submitModal, modalOpen, modalText, answerDialog, shot, signInAs, fsGet, fsSet, isoDay } from "./h.mjs";
+import { BASE, launch, newUserPage, tc, assert, wait, waitFor, text, click, fill, submitModal, modalOpen, modalText, answerDialog, inviteCard, shot, signInAs, fsGet, fsSet, isoDay } from "./h.mjs";
 
 const browser = await launch();
 const stamp = Date.now();
@@ -80,47 +80,51 @@ await tc("C-03", A1, "초대장 이미지 다운로드",
   });
 
 await tc("C-04", A1, "참여 코드로 합류 + 방장 화면 실시간 반영",
-  "지은: 여행 목록 '참여 코드 입력'에 코드 입력 → '코드로 참여하기' / 민수 화면은 새로고침 없이 관찰",
-  "지은은 여행 화면으로 이동, 민수 화면의 '동행자:'에 지은이 몇 초 안에 나타남",
+  "지은: 여행 목록 '참여 코드 입력'에 코드 입력 → '코드로 참여하기' → 초대 카드에서 '참여하기' / 민수 화면은 새로고침 없이 관찰",
+  "바로 합류하지 않고 초대 카드(초대한 사람·여행 이름·동행자 수)가 먼저 뜸, 참여하면 여행 화면으로 이동, 민수 화면의 '동행자:'에 지은이 몇 초 안에 나타남",
   async () => {
     await pb.goto(BASE + "/", { waitUntil: "domcontentloaded" });
     await waitFor(pb, () => !!document.querySelector("input[placeholder*='참여 코드']"), { label: "join input" });
     await pb.type("input[placeholder*='참여 코드']", TRIP_ID);
     const t0 = Date.now();
     await click(pb, "button", "코드로 참여하기");
-    await waitFor(pb, () => location.pathname.includes("/trip/"), { label: "B in trip" });
+    const card = await inviteCard(pb);
+    const before = await fsGet(`trips/${TRIP_ID}`);
+    assert(card.includes("민수님이 여행에 초대했어요") && card.includes("동행자 1명") && !before.memberIds.includes(B), card + " / " + JSON.stringify(before.memberIds));
+    await inviteCard(pb, { join: true });
     await waitFor(po, () => document.querySelector(".trip-head")?.innerText.includes("지은"), { label: "O sees B", timeout: 10000 });
-    return `지은 합류 후 민수 화면 반영까지 약 ${((Date.now() - t0) / 1000).toFixed(1)}초`;
+    return `초대 카드 "${card.split("\n").slice(1, 3).join(" / ")}" → 참여 → 민수 화면 반영까지 약 ${((Date.now() - t0) / 1000).toFixed(1)}초`;
   });
 
 await tc("C-05", A1, "잘못된 참여 코드 / 이미 참여한 여행 코드 재입력",
   "지은: 없는 코드 입력 → 참여 / 이미 참여한 여행 코드 다시 입력",
-  "없는 코드는 '코드를 찾을 수 없어요', 이미 참여한 코드는 동행자가 중복되지 않음",
+  "없는 코드는 카드에 '초대 코드를 찾을 수 없어요', 이미 참여한 코드는 '이미 참여 중인 여행이에요'와 '여행 열기', 동행자 중복 없음",
   async () => {
     await pb.goto(BASE + "/", { waitUntil: "domcontentloaded" });
     await waitFor(pb, () => !!document.querySelector("input[placeholder*='참여 코드']"), { label: "join input" });
     await pb.type("input[placeholder*='참여 코드']", "nope-not-a-trip");
     await click(pb, "button", "코드로 참여하기");
-    await wait(2000);
-    const err = await pb.evaluate(() => [...document.querySelectorAll(".section-note")].map((e) => e.innerText).join(" "));
-    await pb.evaluate(() => { const i = document.querySelector("input[placeholder*='참여 코드']"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(i, ""); i.dispatchEvent(new Event("input", { bubbles: true })); });
+    const err = (await inviteCard(pb)).split("\n")[1] || "";
+    await click(pb, ".invite-card button", "내 여행으로");
+    await waitFor(pb, () => !!document.querySelector("input[placeholder*='참여 코드']"), { label: "join input again" });
     await pb.type("input[placeholder*='참여 코드']", ` ${TRIP_ID} `);
     await click(pb, "button", "코드로 참여하기");
-    await wait(2000);
+    const again = await inviteCard(pb);
+    await click(pb, ".invite-card button", "여행 열기");
+    await waitFor(pb, () => location.pathname.includes(`/trip/`), { label: "opened" });
     const t = await fsGet(`trips/${TRIP_ID}`);
-    assert(err.includes("찾을 수 없") && t.memberIds.length === 2, `${err} / members ${t.memberIds.length}`);
-    return `없는 코드: "${err.trim()}" / 재참여 후 동행자 수 ${t.memberIds.length} (앞뒤 공백 포함 입력도 처리됨)`;
+    assert(err.includes("찾을 수 없") && again.includes("이미 참여 중") && t.memberIds.length === 2, `${err} / ${again} / members ${t.memberIds.length}`);
+    return `없는 코드: "${err.trim()}" / 이미 참여한 코드: "이미 참여 중인 여행이에요" → 여행 열기, 동행자 수 ${t.memberIds.length} (앞뒤 공백 포함 입력도 처리됨)`;
   });
 
 await tc("C-06", A1, "로그아웃 상태에서 초대 링크(/join/...)로 합류",
   "서연: 로그인 안 된 브라우저로 /join/<코드> 접속 → 로그인",
-  "로그인 화면이 뜨고, 로그인하면 자동으로 그 여행에 합류해 여행 화면 표시 (새 계정은 약관 동의 → 닉네임 순)",
+  "로그인 화면이 뜨고, 로그인하면 약관 동의 → 닉네임 → 초대 카드 순서, '참여하기'로 합류해 여행 화면 표시",
   async () => {
     await pc.goto(`${BASE}/join/${TRIP_ID}`, { waitUntil: "domcontentloaded" });
     await waitFor(pc, () => !!document.querySelector(".auth-card"), { label: "login shown" });
     const beforeLp = await pc.evaluate(() => !!document.querySelector(".lp"));
     await pc.evaluate((uid) => window.__emulatorSignIn(uid), C);
-    await waitFor(pc, () => location.pathname === location.pathname && location.pathname.includes("/trip/"), { label: "C joined", timeout: 15000 });
     // A brand-new account: the terms agreement comes first, then the nickname.
     await waitFor(pc, () => !!document.querySelector(".modal input[name=agree]"), { label: "C terms dialog", timeout: 8000 });
     await pc.evaluate(() => document.querySelector(".modal input[name=agree]").click());
@@ -128,9 +132,12 @@ await tc("C-06", A1, "로그아웃 상태에서 초대 링크(/join/...)로 합�
     await waitFor(pc, () => !!document.querySelector(".modal input[name=nickname]"), { label: "C nickname prompt", timeout: 8000 });
     await fill(pc, { nickname: "서연" }); await submitModal(pc);
     await waitFor(pc, () => !document.querySelector(".modal"), { label: "C nickname saved" });
+    const notYet = !(await fsGet(`trips/${TRIP_ID}`)).memberIds.includes(C);
+    await inviteCard(pc, { join: true });
+    assert(notYet, "joined before pressing 참여하기");
     const t = await fsGet(`trips/${TRIP_ID}`);
     assert(!beforeLp && t.memberIds.includes(C), JSON.stringify(t.memberIds));
-    return `로그인 화면 표시 → 로그인 후 자동 합류, 약관 동의 → 닉네임 순서 (동행자 ${t.memberIds.length}명)`;
+    return `로그인 화면 → 약관 동의 → 닉네임 → 초대 카드 '참여하기'로 합류 (동행자 ${t.memberIds.length}명)`;
   });
 
 await tc("C-07", A1, "동행자 기본 권한 (방장이 권한을 주기 전)",
@@ -461,14 +468,13 @@ await tc("M-02", A5, "내보낸 동행자가 같은 코드로 다시 합류 시�
     await waitFor(pc, () => !!document.querySelector("input[placeholder*='참여 코드']"), { label: "join input" });
     await pc.type("input[placeholder*='참여 코드']", TRIP_ID);
     await click(pc, "button", "코드로 참여하기");
-    await wait(2500);
-    const codeMsg = await pc.evaluate(() => [...document.querySelectorAll(".section-note")].map((e) => e.innerText).join(" "));
+    const codeMsg = (await inviteCard(pc)).replace(/\s+/g, " ");
     await pc.goto(`${BASE}/join/${TRIP_ID}`, { waitUntil: "domcontentloaded" });
-    await wait(3000);
-    const linkMsg = await pc.evaluate(() => document.querySelector(".note.flash")?.innerText || "");
+    const linkMsg = (await inviteCard(pc)).replace(/\s+/g, " ");
+    const hasJoin = await pc.evaluate(() => [...document.querySelectorAll(".invite-card button")].some((b) => b.innerText === "참여하기"));
     const t = await fsGet(`trips/${TRIP_ID}`);
-    assert(!t.memberIds.includes(C) && codeMsg.includes("참여할 수 없는") && linkMsg.includes("참여하지 못했어요"), JSON.stringify({ members: t.memberIds, codeMsg, linkMsg }));
-    return `코드: "${codeMsg.trim()}" / 링크: "${linkMsg.replace(/✕/, "").trim()}"`;
+    assert(!t.memberIds.includes(C) && !hasJoin && codeMsg.includes("참여할 수 없어요") && linkMsg.includes("내보낸"), JSON.stringify({ members: t.memberIds, codeMsg, linkMsg }));
+    return `코드·링크 모두 초대 카드에 "${codeMsg.replace(/^\S+\s/, "").slice(0, 70)}…" (참여 버튼 없음)`;
   });
 
 await tc("M-02b", A5, "방장이 '다시 참여 허용' 후 재합류",
@@ -484,7 +490,7 @@ await tc("M-02b", A5, "방장이 '다시 참여 허용' 후 재합류",
     await waitFor(pc, () => !!document.querySelector("input[placeholder*='참여 코드']"), { label: "join input" });
     await pc.type("input[placeholder*='참여 코드']", TRIP_ID);
     await click(pc, "button", "코드로 참여하기");
-    await waitFor(pc, () => location.pathname.includes("/trip/"), { label: "rejoined", timeout: 8000 });
+    await inviteCard(pc, { join: true });
     const t = await fsGet(`trips/${TRIP_ID}`);
     assert(t.memberIds.includes(C) && !listed, JSON.stringify({ members: t.memberIds, listed }));
     return "허용 후 목록에서 사라지고, 서연이 같은 코드로 다시 합류";
